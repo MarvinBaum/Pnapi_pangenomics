@@ -1,0 +1,10 @@
+#############################################################################################################################
+
+#Make new directory for these broken pair end reads only:
+mkdir f8_broken_pairs
+
+#Larger command:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data/programs/samtools-1.9/samtools view -f 8 -F 4 -b {}_v_ilPieNapi1.2.srt.bam -o f8_broken_pairs/{}_v_ilPieNapi1.2.f8.bam"
+
+#Test if filtering works:
+/data/programs/samtools-1.9/samtools view -f 8 -F 4 -b C13stmor_v_ilPieNapi1.2.srt.bam -o f8_broken_pairs/C13stmor_v_ilPieNapi1.2.f8.bam

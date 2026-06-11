@@ -26,7 +26,7 @@ ls # should see it (if in red, its does not have a good path)
 # Rename reference to your "reference":
 reference=GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna
 
-Name the rootname to what you want your final bamfile to have as a suffix:
+#Name the rootname to what you want your final bamfile to have as a suffix:
 /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index $reference
 
 #########################################################################################################################
