@@ -81,6 +81,7 @@ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/
 rm *2.bam
 
 #It should look like this now:
+
 C13stmor_v_ilPieNapi1.2.srt.bam
 E12aigua_v_ilPieNapi1.2.srt.bam
 S14skanF_v_ilPieNapi1.2.srt.bam
