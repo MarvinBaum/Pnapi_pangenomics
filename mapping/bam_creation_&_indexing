@@ -80,3 +80,14 @@ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/
 #Remove the unsorted bam files:
 rm *2.bam
 
+#It should look like this now:
+C13stmor_v_ilPieNapi1.2.srt.bam
+E12aigua_v_ilPieNapi1.2.srt.bam
+S14skanF_v_ilPieNapi1.2.srt.bam
+S14skanM_v_ilPieNapi1.2.srt.bam
+S15lulea_v_ilPieNapi1.2.srt.bam
+S15stoEA_v_ilPieNapi1.2.srt.bam
+S15stoLA_v_ilPieNapi1.2.srt.bam
+S15stoMJ_v_ilPieNapi1.2.srt.bam
+S15sunds_v_ilPieNapi1.2.srt.bam
+S15umea_v_ilPieNapi1.2.srt.bam
