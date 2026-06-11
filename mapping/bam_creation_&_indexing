@@ -32,3 +32,19 @@ Name the rootname to what you want your final bamfile to have as a suffix:
 #########################################################################################################################
 #Time to map the reads to the reference and create bam files:
 
+#Assign the string ilPieNapi1.2 to a variable called suffix for downstream use:
+suffix=ilPieNapi1.2
+
+# For each sample in the metadata file align paired-end CTQ reads to the reference and converts to BAM, use dryrun as preview:
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+
+#Explanation of the command above:
+  #sed 1d ../CTQ_Read_Data/pool_metadata.tsv - skips the header line of the metadata TSV file and pipes the remaining rows.
+  #parallel --dryrun — previews the commands without actually running them
+  #--colsep "\t" — splits each TSV line into columns accessible as {1}, {2} etc.
+  #-j 3 — would run 3 samples in parallel
+  #bwa-mem2 mem -t 15 — aligns paired-end reads to the reference using 15 threads
+  #{1} — sample name from column 1 of the TSV, used to find the FASTQ files
+  #samtools view -Sb — converts the SAM output from bwa-mem2 into BAM format
+  #-@6 — uses 6 threads for BAM compression
+  #{2}_v_$suffix.bam — names the output BAM using column 2 of the TSV and the suffix variable
