@@ -1,0 +1,34 @@
+# Overview of metadata command:
+column -t /mnt/griffin/marvi/CTQ_Read_Data/ pool_metadata.ts
+
+#Generates this:
+pop                                                         code      haploid_size
+Pieris_napi.CHF.13.StMoritz.Field.Thorax.24                 C13stmor  48
+Pieris_napi.ESP.12.Aiguamolls.Field.Thorax.24               E12aigua  48
+Pieris_napi.SWE.14.Skane_Kullaberg.Field_females.Thorax.24  S14skanF  48
+Pieris_napi.SWE.14.Skane_Kullaberg.Field.Thorax.24_Males    S14skanM  48
+Pieris_napi.SWE.15.Lulea_Avan.Field.Thorax.30               S15lulea  60
+Pieris_napi.SWE.15.Stockholm_SU.Field_earlyAug.Abdomen.30   S15stoEA  60
+Pieris_napi.SWE.15.Stockholm_SU.Field_lateAug.Abdomen.36    S15stoLA  72
+Pieris_napi.SWE.15.Sundsvall.Field.Thorax.29                S15sunds  58
+Pieris_napi.SWE.15.Umeå.Field.Thorax.30                     S15umea   60
+Pieris_napi.SWE.2015.Stockholm_SU.Field_midJuly.Abdomen.35  S15stoMJ  70
+
+# Soft link the genome by:
+ln -s ../../Pieris_napi-GCA_905475465.2/GCF_905475465.1_ilPieNapi1.2_genomic.fna .
+
+# Check that it works:
+ls # should see it (if in red, its does not have a good path)
+
+######################################################################################################################
+#Now for the INDEXING part:
+
+# Rename reference to your "reference":
+reference=GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna
+
+Name the rootname to what you want your final bamfile to have as a suffix:
+/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index $reference
+
+#########################################################################################################################
+#Time to map the reads to the reference and create bam files:
+
