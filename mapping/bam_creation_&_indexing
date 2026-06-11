@@ -70,9 +70,13 @@ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"
 ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/programs/samtools-1.9/samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam"
 
 #Explaination of the code above:
+ #ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam" -- lists all BAM files and extracts the sample code by removing the suffix, then pipes these sample codes to parallel
  #samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam --Sorts the unsorted BAM file by coordinate using 5 threads & outputs a new sorted BAM with .srt.bam suffix
- #
-
-
+ #samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam --Indexes the sorted BAM file using 5 threads, creating a .bai index file
 
 #Test if sorting works:
+/data/programs/samtools-1.9/samtools sort -@ 5 -o C13stmor_v_ilPieNapi1.2.srt.bam C13stmor_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 C13stmor_v_ilPieNapi1.2.srt.bam
+
+#Remove the unsorted bam files:
+rm *2.bam
+
