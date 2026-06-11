@@ -54,21 +54,25 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3
 /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o C13stmor_v_ilPieNapi1.2.bam
 
 #If the dryrun output looks correct, remove the --dryrun to generate the BAM files:
-sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
 
 #######################################################################################################################################
 #Sorting and indexing the BAM files:
 
+#Have a look at this:
+ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam" 
+
+#Explaination of the code above:
+    #Lists all BAM files, then strips the suffix _v_ilPieNapi1.2.bam from each filename, leaving just the sample code (e.g. C13stmor)
+    #Used to preview what the sample names look like before building the larger command
+
+#The larger command: 
+ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/programs/samtools-1.9/samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam"
+
+#Explaination of the code above:
+ #samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam --Sorts the unsorted BAM file by coordinate using 5 threads & outputs a new sorted BAM with .srt.bam suffix
+ #
 
 
-/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
 
-
-
-$reference
-
- ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz
-
-
-
- | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+#Test if sorting works:
