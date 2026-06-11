@@ -48,3 +48,5 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3
   #samtools view -Sb — converts the SAM output from bwa-mem2 into BAM format
   #-@6 — uses 6 threads for BAM compression
   #{2}_v_$suffix.bam — names the output BAM using column 2 of the TSV and the suffix variable
+
+#If the dryrun output looks correct, remove the --dryrun to generate the BAM files:
