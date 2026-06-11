@@ -49,4 +49,12 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3
   #-@6 — uses 6 threads for BAM compression
   #{2}_v_$suffix.bam — names the output BAM using column 2 of the TSV and the suffix variable
 
+
+# Check if it passed, should look like this for example:
+/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz | samtools view -Sb -@6 - -o C13stmor_v_ilPieNapi1.2.bam
+
 #If the dryrun output looks correct, remove the --dryrun to generate the BAM files:
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+
+#######################################################################################################################################
+#Sorting and indexing the BAM files:
