@@ -36,7 +36,7 @@ Name the rootname to what you want your final bamfile to have as a suffix:
 suffix=ilPieNapi1.2
 
 # For each sample in the metadata file align paired-end CTQ reads to the reference and converts to BAM, use dryrun as preview:
-sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9 view -Sb -@6 - -o {2}_v_$suffix.bam"
 
 #Explanation of the command above:
   #sed 1d ../CTQ_Read_Data/pool_metadata.tsv - skips the header line of the metadata TSV file and pipes the remaining rows.
@@ -51,10 +51,24 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3
 
 
 # Check if it passed, should look like this for example:
-/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz | samtools view -Sb -@6 - -o C13stmor_v_ilPieNapi1.2.bam
+/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz | /data/programs/samtools-1.9 view -Sb -@6 - -o C13stmor_v_ilPieNapi1.2.bam
 
 #If the dryrun output looks correct, remove the --dryrun to generate the BAM files:
-sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9 view -Sb -@6 - -o {2}_v_$suffix.bam"
 
 #######################################################################################################################################
 #Sorting and indexing the BAM files:
+
+
+
+/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
+
+
+
+$reference
+
+ ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz
+
+
+
+ | samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
