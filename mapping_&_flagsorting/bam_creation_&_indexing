@@ -15,7 +15,7 @@ Pieris_napi.SWE.15.Umeå.Field.Thorax.30                     S15umea   60
 Pieris_napi.SWE.2015.Stockholm_SU.Field_midJuly.Abdomen.35  S15stoMJ  70
 
 # Soft link the genome by:
-ln -s ../../Pieris_napi-GCA_905475465.2/GCF_905475465.1_ilPieNapi1.2_genomic.fna .
+ln -s /mnt/griffin/chrwhe/Pieris_napi-GCA_905475465.2 .ln -s /mnt/griffin/chrwhe/Pieris_napi-GCA_905475465.2/GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna .
 
 # Check that it works:
 ls # should see it (if in red, its does not have a good path)
@@ -29,6 +29,9 @@ reference=GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna
 #Name the rootname to what you want your final bamfile to have as a suffix:
 /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index $reference
 
+#Do it alternatively with the full name:
+/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna
+
 #########################################################################################################################
 #Time to map the reads to the reference and create bam files:
 
@@ -36,14 +39,14 @@ reference=GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna
 suffix=ilPieNapi1.2
 
 # For each sample in the metadata file align paired-end CTQ reads to the reference and converts to BAM, use dryrun as preview:
-sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9 view -Sb -@6 - -o {2}_v_$suffix.bam"
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9 view -Sb -@6 - -o {2}_v_ilPieNapi1.2.bam"
 
 #Explanation of the command above:
   #sed 1d ../CTQ_Read_Data/pool_metadata.tsv - skips the header line of the metadata TSV file and pipes the remaining rows.
   #parallel --dryrun — previews the commands without actually running them
   #--colsep "\t" — splits each TSV line into columns accessible as {1}, {2} etc.
-  #-j 3 — would run 3 samples in parallel
-  #bwa-mem2 mem -t 15 — aligns paired-end reads to the reference using 15 threads
+  #-j 2 — would run 2 samples in parallel
+  #bwa-mem2 mem -t 8 — aligns paired-end reads to the reference using 8 threads
   #{1} — sample name from column 1 of the TSV, used to find the FASTQ files
   #samtools view -Sb — converts the SAM output from bwa-mem2 into BAM format
   #-@6 — uses 6 threads for BAM compression
@@ -54,7 +57,7 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 3
 /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 15 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz ../CTQ_Read_Data/Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o C13stmor_v_ilPieNapi1.2.bam
 
 #If the dryrun output looks correct, remove the --dryrun to generate the BAM files:
-sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 $reference ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_$suffix.bam"
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_ilPieNapi1.2.bam"
 
 #######################################################################################################################################
 #Sorting and indexing the BAM files:
@@ -97,3 +100,7 @@ S15umea_v_ilPieNapi1.2.srt.bam
 #Problem solving:
 #Here is the problem with the bam file, $refrence & $suffix screws it up, swap them out with the full names:
 sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_ilPieNapi1.2.bam"
+
+#Accidentaly delelted some stuff had to hyperlink again:
+
+ln -s /mnt/griffin/chrwhe/Pieris_napi-GCA_905475465.2 . #This is an directory!
