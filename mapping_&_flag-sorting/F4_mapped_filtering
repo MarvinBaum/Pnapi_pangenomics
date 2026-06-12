@@ -1,0 +1,10 @@
+#############################################################################################################################
+
+#Make new directory for these mapped end reads only:
+mkdir F4_mapped_reads
+
+#Larger command:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data/programs/samtools-1.9/samtools view -F 4 -b {}_v_ilPieNapi1.2.srt.bam -o F4_mapped_reads/{}_v_ilPieNapi1.2.F4.bam"
+
+#Test if filtering works:
+/data/programs/samtools-1.9/samtools view -F 4 -b C13stmor_v_ilPieNapi1.2.srt.bam -o F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.bam
