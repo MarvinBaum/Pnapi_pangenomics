@@ -1,5 +1,4 @@
 #####################################################################################################################
-#What AI suggested:
 
 #Make a new directory for bam files containing only unmapped reads.
 mkdir f4_unmapped

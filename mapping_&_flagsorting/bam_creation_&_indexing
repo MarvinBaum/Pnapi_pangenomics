@@ -91,3 +91,9 @@ S15stoLA_v_ilPieNapi1.2.srt.bam
 S15stoMJ_v_ilPieNapi1.2.srt.bam
 S15sunds_v_ilPieNapi1.2.srt.bam
 S15umea_v_ilPieNapi1.2.srt.bam
+
+
+###############################################################################################################################
+#Problem solving:
+#Here is the problem with the bam file, $refrence & $suffix screws it up, swap them out with the full names:
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_ilPieNapi1.2.bam"
