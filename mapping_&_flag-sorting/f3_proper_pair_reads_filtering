@@ -8,3 +8,5 @@ ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data
 
 #Test if filtering works:
 /data/programs/samtools-1.9/samtools view -f 3 -b C13stmor_v_ilPieNapi1.2.srt.bam -o f3_proper_pair_reads/C13stmor_v_ilPieNapi1.2.f3.bam
+
+#This will act as additional data regarding the fraction of reads that was mapped to the reference genome.

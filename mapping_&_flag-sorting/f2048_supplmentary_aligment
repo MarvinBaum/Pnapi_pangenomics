@@ -1,0 +1,13 @@
+############################################################################################################
+
+#Make new directory for reads that underwent supplementary aligment (parts of the reads map at one place, part maps elsewhere):
+mkdir f2048_supplmentary_aligment_filtering
+
+#Larger command:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data/programs/samtools-1.9/samtools view -f 2048 -b {}_v_ilPieNapi1.2.srt.bam -o f2048_supplmentary_aligment_filtering/{}_v_ilPieNapi1.2.f2048.bam"
+
+#Test if filtering works:
+/data/programs/samtools-1.9/samtools view -f 2048 -b C13stmor_v_ilPieNapi1.2.srt.bam -o f2048_supplmentary_aligment_filtering/C13stmor_v_ilPieNapi1.2.f2048.bam
+
+#Supplmentary aligment usually occours at break points for structural variant, since butterflies contain a lot of SVs I thought this might be interisting to look into.
+#Keep in mind this is a subset of F4.

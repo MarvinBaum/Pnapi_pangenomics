@@ -8,3 +8,5 @@ ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data
 
 #Test if filtering works:
 /data/programs/samtools-1.9/samtools view -f 4 -b C13stmor_v_ilPieNapi1.2.srt.bam -o f4_unmapped/C13stmor_v_ilPieNapi1.2.f4.bam
+
+#Reads that failed to map to the reference at all, this it the core input for the accessory genome assembly.

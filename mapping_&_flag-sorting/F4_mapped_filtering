@@ -8,3 +8,5 @@ ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data
 
 #Test if filtering works:
 /data/programs/samtools-1.9/samtools view -F 4 -b C13stmor_v_ilPieNapi1.2.srt.bam -o F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.bam
+
+#This will tell us what reads mapped to the reference, which gives us the reference-genome fraction of each pool.

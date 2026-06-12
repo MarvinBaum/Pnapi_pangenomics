@@ -8,3 +8,5 @@ ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel "/data
 
 #Test if filtering works:
 /data/programs/samtools-1.9/samtools view -f 8 -F 4 -b C13stmor_v_ilPieNapi1.2.srt.bam -o f8_broken_pairs/C13stmor_v_ilPieNapi1.2.f8.bam
+
+#This will tell me about the fraction of broken paired end reads in each pool, if it is a lot if could indicate something weird is going on.
