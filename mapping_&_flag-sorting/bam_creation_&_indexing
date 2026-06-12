@@ -104,3 +104,6 @@ sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/p
 #Accidentaly delelted some stuff had to hyperlink again:
 
 ln -s /mnt/griffin/chrwhe/Pieris_napi-GCA_905475465.2 . #This is an directory!
+
+#We can then look at the stats of the BAM file by:
+samtools flagstat sample.bam
