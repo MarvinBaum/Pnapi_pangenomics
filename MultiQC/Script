@@ -1,5 +1,9 @@
 #############################################################################################################################
+#bwa log output will tell statisics of how good it was mapped, procentage.
+
+#############################################################################################################################
 #multiQC for visualization of raw files (general read quality), to see general quaility changes.
+
 #Download Multiqc locally:
 pip install multiqc
 
@@ -14,7 +18,4 @@ samtools flagstat F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.bam > F4_mapped_rea
 #Do the multiQC on the different filtered bam files:
 multiqc file1 file2 file3 file4 .
 
-#############################################################################################################################
-#bwa log output will tell statisics of how good it was mapped, procentage.
-
-#Samtools aligment (look into the manual)
+#Samtools aligment (look into the manual)?
