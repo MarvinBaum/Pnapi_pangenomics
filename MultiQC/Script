@@ -15,8 +15,8 @@ export PATH=$PATH:/home/marvi/.local/bin
 #Flagstat command for all sorted bam files:
 for bam in *.srt.bam; do
     samtools flagstat $bam > ${bam%.bam}.flagstat
+done
 
 #Do the multiQC on the different sorted bam files:
 multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files
 
-#Samtools aligment (look in the manual)?
