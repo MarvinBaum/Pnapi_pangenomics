@@ -1,0 +1,9 @@
+#Install Kraken2
+cd /mnt/griffin/marvi/Kraken2
+wget https://github.com/DerrickWood/kraken2/archive/refs/tags/v2.17.1.tar.gz
+tar -xzf v2.17.1.tar.gz
+cd kraken2-2.17.1
+./install_kraken2.sh /mnt/griffin/marvi/Kraken2
+
+#We need then to install a database of contaminats to check against, ask Alex and Chris for tips, I would suspect Wolbachia is a contentder...¨
+kraken2-build --*DATABASE* --db /mnt/griffin/marvi/Kraken2/db --threads 16
