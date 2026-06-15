@@ -18,5 +18,14 @@ nohup bash -c 'for bam in *.srt.bam; do
 done' &
 
 #Do the multiQC on the different sorted bam flagstat files:
-multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files -o /mnt/griffin/marvi/Mapping/MultiQC
+multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files -o /mnt/griffin/marvi/MultiQC
 
+#Now we can expand our MultiQC report by using samtools stats:
+nohup bash -c '
+for bam in *.srt.bam; do
+    base=${bam%.srt.bam}
+
+    /data/programs/samtools-1.9/samtools flagstat "$bam" > ${base}.flagstat
+    /data/programs/samtools-1.9/samtools stats "$bam" > ${base}.stats
+done
+' &
