@@ -10,12 +10,13 @@ pip install multiqc
 #I then need to export it so it is in my duke directory:
 export PATH=$PATH:/home/marvi/.local/bin
 
-#Before multiQC I will have to run SAMtools flagstat on all filtered bam files, example:
-samtools flagstat F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.bam > F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.flagstat
-
 #Flagstat gives you all the different aligment you dont need to do all of the f3, etc. in samtools view! Except for the f4 to get the unmapped reads which we will be working with.
 
-#Do the multiQC on the different filtered bam files:
-multiqc file1 file2 file3 file4 .
+#Flagstat command for all sorted bam files:
+for bam in *.srt.bam; do
+    samtools flagstat $bam > ${bam%.bam}.flagstat
+done
 
-#Samtools aligment (look in the manual)?
+#Do the multiQC on the different sorted bam files:
+multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files
+

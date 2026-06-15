@@ -69,7 +69,19 @@ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"
     #Lists all BAM files, then strips the suffix _v_ilPieNapi1.2.bam from each filename, leaving just the sample code (e.g. C13stmor)
     #Used to preview what the sample names look like before building the larger command
 
-#The larger command: 
+#Looks like this:
+marvi@duke:/mnt/griffin/marvi/Mapping/bam_files$ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"
+C13stmor
+E12aigua
+S14skanF
+S14skanM
+S15lulea
+S15stoEA
+S15stoLA
+S15stoMJ
+S15sunds
+
+#The larger dryrun command: 
 ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/programs/samtools-1.9/samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam"
 
 #Explaination of the code above:
@@ -77,11 +89,17 @@ ls *bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam"| parallel --dryrun "/data/
  #samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam --Sorts the unsorted BAM file by coordinate using 5 threads & outputs a new sorted BAM with .srt.bam suffix
  #samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam --Indexes the sorted BAM file using 5 threads, creating a .bai index file
 
+#Now for the real command:
+nohup bash -c 'ls *.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam" | parallel -j 2 "/data/programs/samtools-1.9/samtools sort -@ 5 -o {}_v_ilPieNapi1.2.srt.bam {}_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 {}_v_ilPieNapi1.2.srt.bam"' &
+
+#Notice we have 2 jobs working in parallel and use 5 threads for the sorting. nohup and & is to allow the command to work in the background while the terminal is closed.
+
 #Test if sorting works:
 /data/programs/samtools-1.9/samtools sort -@ 5 -o C13stmor_v_ilPieNapi1.2.srt.bam C13stmor_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 C13stmor_v_ilPieNapi1.2.srt.bam
 
-#Remove the unsorted bam files:
-rm *2.bam
+#Move the unsorted bam files to new directory for safekeeping:
+mkdir unsorted_bams
+mv *_v_ilPieNapi1.2.bam unsorted_bams/
 
 #It should look like this now:
 C13stmor_v_ilPieNapi1.2.srt.bam
