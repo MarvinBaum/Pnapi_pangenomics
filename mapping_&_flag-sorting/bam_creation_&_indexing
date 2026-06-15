@@ -97,8 +97,9 @@ nohup bash -c 'ls *.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.bam" | parallel
 #Test if sorting works:
 /data/programs/samtools-1.9/samtools sort -@ 5 -o C13stmor_v_ilPieNapi1.2.srt.bam C13stmor_v_ilPieNapi1.2.bam; /data/programs/samtools-1.9/samtools index -@ 5 C13stmor_v_ilPieNapi1.2.srt.bam
 
-#Remove the unsorted bam files:
-rm *2.bam
+#Move the unsorted bam files to new directory for safekeeping:
+mkdir unsorted_bams
+mv *_v_ilPieNapi1.2.bam unsorted_bams/
 
 #It should look like this now:
 C13stmor_v_ilPieNapi1.2.srt.bam

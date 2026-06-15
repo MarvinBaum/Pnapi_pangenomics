@@ -8,6 +8,6 @@ samtools fastq \
 #Explanation of the code above:
 #-1 — output R1 reads
 #-2 — output R2 reads
-#-s — singletons (unpaired reads, good to keep but not used in assembly
+#-s — singletons (unpaired reads, good to keep but not used in assembly)
 
 #After this we can use metaSPAdes:
