@@ -1,13 +1,40 @@
 #Need to convert unread reads back to R1 & R2 reads in FastQ file:
 samtools fastq \
-    -1 sample_R1.fastq \
-    -2 sample_R2.fastq \
-    -s sample_singletons.fastq \
-    f4_unmapped/sample_v_ilPieNapi1.2.f4.bam
+    for bam in f4_unmapped/*f4.bam; do
+    sample=$(basename $bam _v_ilPieNapi1.2.f4.bam)
+    samtools fastq \
+        -1 ${sample}_R1.fastq \
+        -2 ${sample}_R2.fastq \
+        -s ${sample}_singletons.fastq \
+        $bam
+done
 
 #Explanation of the code above:
 #-1 — output R1 reads
 #-2 — output R2 reads
 #-s — singletons (unpaired reads, good to keep but not used in assembly)
 
+########################################################################################################################
 #After this we can use metaSPAdes:
+
+#Begin by installing SPAdes:
+wget https://github.com/ablab/spades/releases/download/v4.3.0/SPAdes-4.3.0-Linux.tar.gz
+tar -xzf SPAdes-4.3.0-Linux.tar.gz
+
+#First the large dryrun metaSPAdes command:
+ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel --dryrun -j 2 "spades.py --meta \
+    -1 {}_R1.fastq \
+    -2 {}_R2.fastq \
+    -t 8 \
+    -m 500 \
+    -o metaspades_output/{}"
+
+#Now run the real metaSPAdes command:
+nohup bash -c 'ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel -j 2 "spades.py --meta \
+    -1 {}_R1.fastq \
+    -2 {}_R2.fastq \
+    -t 8 \
+    -m 500 \
+    -o metaspades_output/{}"' &
+
+#Now we should have the assembled de novo contigs for each sampling location and now we can move forward using Kraken2 to filter out eventual contaminants.
