@@ -107,3 +107,6 @@ ln -s /mnt/griffin/chrwhe/Pieris_napi-GCA_905475465.2 . #This is an directory!
 
 #We can then look at the stats of the BAM file by:
 samtools flagstat sample.bam
+
+#Only 2 BAM created, try this command, nohup means it runs even if I am not logged in:
+nohup bash -c 'sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna ../CTQ_Read_Data/{1}_1.ctq.fq.gz ../CTQ_Read_Data/{1}_2.ctq.fq.gz | /data/programs/samtools-1.9/samtools view -Sb -@6 - -o {2}_v_ilPieNapi1.2.bam"' 
