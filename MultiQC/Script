@@ -13,9 +13,9 @@ export PATH=$PATH:/home/marvi/.local/bin
 #Flagstat gives you all the different aligment you dont need to do all of the f3, etc. in samtools view! Except for the f4 to get the unmapped reads which we will be working with.
 
 #Flagstat command for all sorted bam files:
-for bam in *.srt.bam; do
-    samtools flagstat $bam > ${bam%.bam}.flagstat
-done
+nohup bash -c 'for bam in *.srt.bam; do
+    /data/programs/samtools-1.9/samtools flagstat $bam > ${bam%.bam}.flagstat
+done' &
 
 #Do the multiQC on the different sorted bam files:
 multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files
