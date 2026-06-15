@@ -1,13 +1,9 @@
 #Need to convert unread reads back to R1 & R2 reads in FastQ file:
-samtools fastq \
-    for bam in f4_unmapped/*f4.bam; do
-    sample=$(basename $bam _v_ilPieNapi1.2.f4.bam)
-    samtools fastq \
-        -1 ${sample}_R1.fastq \
-        -2 ${sample}_R2.fastq \
-        -s ${sample}_singletons.fastq \
-        $bam
-done
+/data/programs/samtools-1.9/samtools fastq \
+    -1 C13stmor_R1.fastq \
+    -2 C13stmor_R2.fastq \
+    -s C13stmor_singletons.fastq \
+    f4_unmapped/C13stmor_v_ilPieNapi1.2.f4.bam
 
 #Explanation of the code above:
 #-1 — output R1 reads
