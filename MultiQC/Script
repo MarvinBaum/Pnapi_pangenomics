@@ -18,4 +18,4 @@ samtools flagstat F4_mapped_reads/C13stmor_v_ilPieNapi1.2.F4.bam > F4_mapped_rea
 #Do the multiQC on the different filtered bam files:
 multiqc file1 file2 file3 file4 .
 
-#Samtools aligment (look into the manual)?
+#Samtools aligment (look in the manual)?

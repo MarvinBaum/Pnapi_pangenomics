@@ -1,0 +1,13 @@
+#Need to convert unread reads back to R1 & R2 reads in FastQ file:
+samtools fastq \
+    -1 sample_R1.fastq \
+    -2 sample_R2.fastq \
+    -s sample_singletons.fastq \
+    f4_unmapped/sample_v_ilPieNapi1.2.f4.bam
+
+#Explanation of the code above:
+#-1 — output R1 reads
+#-2 — output R2 reads
+#-s — singletons (unpaired reads, good to keep but not used in assembly
+
+#After this we can use metaSPAdes:
