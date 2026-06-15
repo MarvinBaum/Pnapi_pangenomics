@@ -17,6 +17,6 @@ nohup bash -c 'for bam in *.srt.bam; do
     /data/programs/samtools-1.9/samtools flagstat $bam > ${bam%.bam}.flagstat
 done' &
 
-#Do the multiQC on the different sorted bam files:
-multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files
+#Do the multiQC on the different sorted bam flagstat files:
+multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files -o /mnt/griffin/marvi/Mapping/MultiQC
 
