@@ -1,3 +1,6 @@
+#First soft link this direcoty to the f4_unmapped_reads:
+ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f4_unmapped_reads /mnt/griffin/marvi/metaSPAdes/
+
 #Need to convert unread reads back to R1 & R2 reads in FastQ file:
 /data/programs/samtools-1.9/samtools fastq \
     -1 C13stmor_R1.fastq \
