@@ -81,7 +81,7 @@ for sample in $(ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam");
 
 done
 
-#Run the script i have written in the sorted_bam_files directory:
+#Run the script in the sorted_bam_files directory:
 nohup bash /mnt/griffin/marvi/metaSPAdes/accessory_fastq/merge_and_convert.sh &
 
 
