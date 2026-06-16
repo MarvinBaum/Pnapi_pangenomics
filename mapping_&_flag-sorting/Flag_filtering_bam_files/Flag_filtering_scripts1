@@ -34,3 +34,53 @@ nohup bash -c 'ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | 
 
 ####################################################################################################################################
 #Now we filter out reads that are mapped but their mate is unmapped, we do this by using the -f 8 -F 4 flags.
+
+#Make a new directory for the mapped reads where the mate is unmapped:
+mkdir f8_mapped_unmapped_mate
+
+#Large dryrun command:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel --dryrun -j 2 \
+    "/data/programs/samtools-1.9/samtools view -f 8 -F 4 -b \
+    {}_v_ilPieNapi1.2.srt.bam -o f8_mapped_unmapped_mate/{}_v_ilPieNapi1.2.f8F4.bam"
+
+#The real large command:
+nohup bash -c 'ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel -j 2 "/data/programs/samtools-1.9/samtools view -f 8 -F 4 -b {}_v_ilPieNapi1.2.srt.bam -o f8_mapped_unmapped_mate/{}_v_ilPieNapi1.2.f8F4.bam"' &
+
+######################################################################################################################################
+#Now its time to merge all three categories of filtered bam files.
+
+#Make a new directory where we will store all the acessory fastQ files (kept in the metaSPAdes directory):
+mkdir accessory_fastq
+
+#Soft link the f8_mapped_unmapped_mate, f4_unmapped_mapped_mate and f12_unmapped directories to the acessory_fastq directory:
+ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f12_unmapped .
+ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f4_unmapped_mapped_mate .
+ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f8_mapped_unmapped_mate .
+
+#All the below is compiled into a nanoscript:
+#Merge all acessory bam files per sample: 
+for sample in $(ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam"); do
+    # Merge all accessory BAMs for this sample
+    /data/programs/samtools-1.9/samtools merge -f -@ 8 \
+        temp_${sample}_accessory.bam \
+        f12_unmapped/${sample}_v_ilPieNapi1.2.f12.bam \
+        f4_unmapped_mapped_mate/${sample}_v_ilPieNapi1.2.f4F8.bam \
+        f8_mapped_unmapped_mate/${sample}_v_ilPieNapi1.2.f8F4.bam
+    
+
+#Use samtools collate to restore mate pairing before converting back to fastQ format:
+/data/programs/samtools-1.9/samtools collate -@ 8 -O temp_${sample}_accessory.bam | \
+    /data/programs/samtools-1.9/samtools fastq \
+        -1 /mnt/griffin/marvi/metaSPAdes/accessory_fastq/${sample}_R1.fastq \
+        -2 /mnt/griffin/marvi/metaSPAdes/accessory_fastq/${sample}_R2.fastq \
+        -
+
+    
+# Clean up temp merge file
+    rm temp_${sample}_accessory.bam
+
+done
+
+#Run the script i have written in the sorted_bam_files directory:
+nohup bash /mnt/griffin/marvi/metaSPAdes/accessory_fastq/merge_and_convert.sh &
+    
