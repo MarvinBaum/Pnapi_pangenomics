@@ -1,0 +1,36 @@
+##############################################################################################################################
+#We begin by filtering out the reads which were both unmapped using the -f 12 flag.
+
+#Make a new directory for the both unmapped reads:
+mkdir f12_unmapped
+
+#Large dryrun command for the f12 filtering:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel --dryrun -j 2 \
+    "/data/programs/samtools-1.9/samtools view -f 12 -F 256 -b \
+    {}_v_ilPieNapi1.2.srt.bam -o f12_unmapped/{}_v_ilPieNapi1.2.f12.bam"
+
+#The -F 256 flag is used to exclude secondary alignments, which they aren't really informative in our case (secodnary means the read maps to another location in additon to the primary alignment, hence they aren't really representive of true unmapped reads).
+
+#Now the real large f12 command:
+ nohup bash -c 'ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel -j 2 "/data/programs/samtools-1.9/samtools view -f 12 -F 256 -b {}_v_ilPieNapi1.2.srt.bam -o f12_unmapped/{}_v_ilPieNapi1.2.f12.bam"' &
+
+#The f12 bam files are now stored in f12_unmapped directory.
+
+###################################################################################################################################
+#Now we filter out where the read is unmapped and the mate is mapped, we do this by using the -f 4 -F 8 flags.
+
+#Make a new directory for the unmapped reads where the mate is mapped:
+mkdir f4_unmapped_mapped_mate
+
+#Large dryrun command:
+ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel --dryrun -j 2 \
+    "/data/programs/samtools-1.9/samtools view -f 4 -F 8 -b \
+    {}_v_ilPieNapi1.2.srt.bam -o f4_unmapped_mapped_mate/{}_v_ilPieNapi1.2.f4F8.bam"
+
+#The real large command:
+nohup bash -c 'ls *.srt.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.srt.bam" | parallel -j 2 "/data/programs/samtools-1.9/samtools view -f 4 -F 8 -b {}_v_ilPieNapi1.2.srt.bam -o f4_unmapped_mapped_mate/{}_v_ilPieNapi1.2.f4F8.bam"' &
+
+#The f4F8 bam files are now stored in f4_unmapped_mapped_mate directory.
+
+####################################################################################################################################
+#Now we filter out reads that are mapped but their mate is unmapped, we do this by using the -f 8 -F 4 flags.
