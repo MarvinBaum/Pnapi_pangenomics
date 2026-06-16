@@ -29,3 +29,9 @@ for bam in *.srt.bam; do
     /data/programs/samtools-1.9/samtools stats "$bam" > ${base}.stats
 done
 ' &
+
+#Do the multiQC again on the different sorted bam flagstat and bam stats files:
+multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files -o /mnt/griffin/marvi/MultiQC
+
+#Then download multiQC report to local computer:
+scp marvi@duke.zoologi.su.se:/mnt/griffin/marvi/MultiQC/multiqc_report_1.html .
