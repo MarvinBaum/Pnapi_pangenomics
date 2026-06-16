@@ -1,17 +1,15 @@
 #First soft link this direcoty to the f4_unmapped_reads:
 ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f4_unmapped_reads /mnt/griffin/marvi/metaSPAdes/
 
-#Need to convert unread reads back to R1 & R2 reads in FastQ file:
-/data/programs/samtools-1.9/samtools fastq \
-    -1 C13stmor_R1.fastq \
-    -2 C13stmor_R2.fastq \
-    -s C13stmor_singletons.fastq \
-    f4_unmapped/C13stmor_v_ilPieNapi1.2.f4.bam
+#Need to convert unmapped reads back to R1 & R2 reads in fastQ files, the large dryrun command:
+ls f4_unmapped_reads/*f4.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.f4.bam" | parallel --dryrun -j 2 "/data/programs/samtools-1.9/samtools fastq -1 /mnt/griffin/marvi/metaSPAdes/{}_R1.fastq -2 /mnt/griffin/marvi/metaSPAdes/{}_R2.fastq f4_unmapped_reads/{}_v_ilPieNapi1.2.f4.bam"
+
+#The real command:
+nohup bash -c 'ls f4_unmapped_reads/*f4.bam | xargs -n1 basename -s "_v_ilPieNapi1.2.f4.bam" | parallel -j 2 "/data/programs/samtools-1.9/samtools fastq -1 /mnt/griffin/marvi/metaSPAdes/{}_R1.fastq -2 /mnt/griffin/marvi/metaSPAdes/{}_R2.fastq f4_unmapped_reads/{}_v_ilPieNapi1.2.f4.bam"' &
 
 #Explanation of the code above:
 #-1 — output R1 reads
 #-2 — output R2 reads
-#-s — singletons (unpaired reads, good to keep but not used in assembly)
 
 ########################################################################################################################
 #After this we can use metaSPAdes:
