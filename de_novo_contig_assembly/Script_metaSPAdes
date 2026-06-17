@@ -11,7 +11,7 @@ ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel --dryrun -j 2 "/mnt
     -1 {}_R1.fastq \
     -2 {}_R2.fastq \
     -t 8 \
-    -m 250 \
+    -m 200 \
     -o metaspades_output/{}"
 
 #Now run the real metaSPAdes command:
@@ -19,7 +19,7 @@ nohup bash -c 'ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel -j 2
     -1 {}_R1.fastq \
     -2 {}_R2.fastq \
     -t 8 \
-    -m 250 \
+    -m 200 \
     -o metaspades_output/{}"' &
 
 #Now we should have the assembled de novo contigs for each sampling location and now we can move forward using Kraken2 to filter out eventual contaminants.
