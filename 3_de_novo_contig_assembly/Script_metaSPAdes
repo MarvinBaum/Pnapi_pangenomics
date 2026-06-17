@@ -2,24 +2,23 @@
 #metaSPAdes:
 
 #Begin by installing SPAdes:
-wget https://github.com/ablab/spades/releases/download/v4.3.0/SPAdes-4.3.0-Linux.tar.gz
-tar -xzf SPAdes-4.3.0-Linux.tar.gz
+wget https://github.com/ablab/spades/releases/download/v3.15.5/SPAdes-3.15.5-Linux.tar.gz
+tar -xzf SPAdes-3.15.5-Linux.tar.gz
 
 #First the large dryrun metaSPAdes command:
-ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel --dryrun -j 2 "/mnt/griffin/marvi/metaSPAdes/SPAdes-4.3.0-Linux/bin/spades.py --meta \
-
+ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel --dryrun -j 2 "/mnt/griffin/marvi/metaSPAdes/SPAdes-3.15.5-Linux/bin/spades.py --meta \
     -1 {}_R1.fastq \
     -2 {}_R2.fastq \
     -t 8 \
-    -m 200 \
+    -m 150 \
     -o metaspades_output/{}"
 
 #Now run the real metaSPAdes command:
-nohup bash -c 'ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel -j 2 "/mnt/griffin/marvi/metaSPAdes/SPAdes-4.3.0-Linux/bin/spades.py --meta \
+nohup bash -c 'ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel -j 2 "/mnt/griffin/marvi/metaSPAdes/SPAdes-3.15.5-Linux/bin/spades.py --meta \
     -1 {}_R1.fastq \
     -2 {}_R2.fastq \
     -t 8 \
-    -m 200 \
+    -m 150 \
     -o metaspades_output/{}"' &
 
 #Now we should have the assembled de novo contigs for each sampling location and now we can move forward using Kraken2 to filter out eventual contaminants.
