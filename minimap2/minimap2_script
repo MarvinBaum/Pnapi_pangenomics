@@ -1,0 +1,9 @@
+###################################################################################################################
+#We will use minimap2 on the de novo contigs to see if sequences align to the P.napi refrence genome, if this is the case they are not truly acessory sequences and are to be filtered out.
+
+#Begin by installing minimap2 (do this in the minimap2 directory):
+wget https://github.com/lh3/minimap2/releases/download/v2.31/minimap2-2.31_x64-linux.tar.bz2
+tar -xjf minimap2-2.31_x64-linux.tar.bz2
+find . -name "minimap2"
+
+#First the minimap2 dryrun command:
