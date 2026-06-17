@@ -21,4 +21,4 @@ nohup bash -c 'ls *_R1.fastq | xargs -n1 basename -s "_R1.fastq" | parallel -j 2
     -m 150 \
     -o metaspades_output/{}"' &
 
-#Now we should have the assembled de novo contigs for each sampling location and now we can move forward using Kraken2 to filter out eventual contaminants.
+#Now we should have the assembled de novo contigs for each sampling location and now we can move forward using minimap2 and then Kraken2/Blobtools.
