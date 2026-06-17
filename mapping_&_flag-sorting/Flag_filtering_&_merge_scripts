@@ -57,6 +57,7 @@ ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f12_unmapped .
 ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f4_unmapped_mapped_mate .
 ln -s /mnt/griffin/marvi/Mapping/sorted_bam_files/f8_mapped_unmapped_mate .
 
+#########################################################################################################
 #All the below is compiled into a nanoscript:
 #!/bin/bash
 
@@ -85,11 +86,12 @@ for bam in f12_unmapped/*.f12.bam; do
 
 done
 
+##############################################################################################################
 #Run the script in the sorted_bam_files directory:
 nohup bash /mnt/griffin/marvi/metaSPAdes/accessory_fastq/merge_and_convert_script.sh &
 
 
 
 
-    #!/bin/bash
+
 
