@@ -67,3 +67,6 @@ done
 
 #Run nano script:
 nohup bash filter_accessory_contigs.sh &
+
+#We now have filtered out contigs that aligned to the reference genome, from these new accesory contigs we can now put them into Kraken2/blobtools to filter out contaminants.
+
