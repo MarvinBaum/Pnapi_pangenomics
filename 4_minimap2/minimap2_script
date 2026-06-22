@@ -42,6 +42,8 @@ nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_cont
 
 mkdir -p accessory_contigs_filtered
 
+#All of the following is in a nanoscript called filter_accesory_contigs.sh:
+
 for sam in minimap2_output/*_vs_ref.sam; do
     sample=$(basename "$sam" "_vs_ref.sam")
     echo "Processing $sample"
@@ -62,3 +64,6 @@ for sam in minimap2_output/*_vs_ref.sam; do
     xargs /data/programs/samtools-1.9/samtools faidx contigs_renamed/${sample}_contigs.fasta < minimap2_output/${sample}_accessory_contig_ids.txt > accessory_contigs_filtered/${sample}_accessory_contigs.fasta
 
 done
+
+#Run nano script:
+nohup bash filter_accessory_contigs.sh &
