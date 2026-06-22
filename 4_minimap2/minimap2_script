@@ -1,3 +1,17 @@
+##################################################################################################################
+#We begin making a new direcoty in minimap2 for the contigs, then renaming to reflect their sampling location and then moving them:
+
+mkdir -p /mnt/griffin/marvi/minimap2/contigs_renamed
+
+for dir in metaspades_output/*/; do
+    sample=$(basename "$dir")
+    cp ${dir}contigs.fasta /mnt/griffin/marvi/minimap2/contigs_renamed/${sample}_contigs.fasta
+done
+
+#Check it worked:
+ls -lh /mnt/griffin/marvi/minimap2/contigs_renamed/
+
+
 ###################################################################################################################
 #We will use minimap2 on the de novo contigs to see if sequences align to the P.napi refrence genome, if this is the case they are not truly accessory sequences and are to be filtered out.
 
@@ -6,4 +20,45 @@ wget https://github.com/lh3/minimap2/releases/download/v2.31/minimap2-2.31_x64-l
 tar -xjf minimap2-2.31_x64-linux.tar.bz2
 find . -name "minimap2"
 
+#Make a directory for the minimap2 output:
+mkdir minimap2_output
+
 #First the minimap2 dryrun command:
+ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel --dryrun -j 2 \
+    "/mnt/griffin/marvi/minimap2/minimap2-2.31_x64-linux/minimap2 -ax asm5 -t 8 \
+    /mnt/griffin/marvi/Mapping/GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna \
+    contigs_renamed/{}_contigs.fasta \
+    > minimap2_output/{}_vs_ref.sam"
+
+#Now the real minimap2 command:
+nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel -j 2 \
+    "/mnt/griffin/marvi/minimap2/minimap2-2.31_x64-linux/minimap2 -ax asm5 -t 8 \
+    /mnt/griffin/marvi/Mapping/GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna \
+    contigs_renamed/{}_contigs.fasta \
+    > minimap2_output/{}_vs_ref.sam"' &
+
+#######################################################################################################################
+#Filter out contigs that align to the reference - keep only truly accessory (non-reference) contigs, using samtools faidx instead of seqkit (not installed on duke)
+
+mkdir -p accessory_contigs_filtered
+
+for sam in minimap2_output/*_vs_ref.sam; do
+    sample=$(basename "$sam" "_vs_ref.sam")
+    echo "Processing $sample"
+
+    # Extract IDs of contigs that DID align to the reference
+    /data/programs/samtools-1.9/samtools view -F 4 "$sam" | cut -f1 | sort -u > minimap2_output/${sample}_mapped_contig_ids.txt
+
+    # Extract all contig IDs from the original fasta
+    grep ">" contigs_renamed/${sample}_contigs.fasta | sed 's/>//' | sort -u > minimap2_output/${sample}_all_contig_ids.txt
+
+    # Find contig IDs NOT in the mapped list (truly accessory)
+    comm -23 minimap2_output/${sample}_all_contig_ids.txt minimap2_output/${sample}_mapped_contig_ids.txt > minimap2_output/${sample}_accessory_contig_ids.txt
+
+    # Index the fasta file (creates a .fai index for fast lookup)
+    /data/programs/samtools-1.9/samtools faidx contigs_renamed/${sample}_contigs.fasta
+
+    # Extract only the accessory contigs using the ID list
+    xargs /data/programs/samtools-1.9/samtools faidx contigs_renamed/${sample}_contigs.fasta < minimap2_output/${sample}_accessory_contig_ids.txt > accessory_contigs_filtered/${sample}_accessory_contigs.fasta
+
+done
