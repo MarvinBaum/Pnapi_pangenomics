@@ -11,7 +11,6 @@ done
 #Check it worked:
 ls -lh /mnt/griffin/marvi/minimap2/contigs_renamed/
 
-
 ###################################################################################################################
 #We will use minimap2 on the de novo contigs to see if sequences align to the P.napi refrence genome, if this is the case they are not truly accessory sequences and are to be filtered out.
 
