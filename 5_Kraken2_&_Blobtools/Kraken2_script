@@ -1,9 +1,12 @@
-#Install Kraken2
+#Begin by soft linking the accesory contigs generated from the minimap2 part of analysis:
+ln -s /mnt/griffin/marvi/minimap2/accessory_contigs_filtered /mnt/griffin/marvi/Kraken2/
+
+#Then install Kraken2
 cd /mnt/griffin/marvi/Kraken2
 wget https://github.com/DerrickWood/kraken2/archive/refs/tags/v2.17.1.tar.gz
 tar -xzf v2.17.1.tar.gz
 cd kraken2-2.17.1
 ./install_kraken2.sh /mnt/griffin/marvi/Kraken2
 
-#We need then to install a database of contaminats to check against, ask Alex and Chris for tips, I would suspect Wolbachia is a contentder...¨
-kraken2-build --*DATABASE* --db /mnt/griffin/marvi/Kraken2/db --threads 16
+#Build the standard database (includes archaea, bacteria [incl. Wolbachia], viral, plasmid, human, UniVec_Core):
+nohup /mnt/griffin/marvi/Kraken2/kraken2-build --standard --use-ftp --db /mnt/griffin/marvi/Kraken2/db --threads 16 &
