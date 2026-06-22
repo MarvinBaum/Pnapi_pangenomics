@@ -68,5 +68,26 @@ done
 #Run nano script:
 nohup bash filter_accessory_contigs.sh &
 
+#To compare to the orignal contigs you can use this loop command:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    orig=$(grep -c ">" contigs_renamed/${sample}_contigs.fasta)
+    filt=$(grep -c ">" accessory_contigs_filtered/${sample}_accessory_contigs.fasta)
+    echo "$sample: $orig -> $filt"
+done
+
+#Comes out like this:
+C13stmor: 352447 -> 332346
+E12aigua: 465624 -> 438655
+S14skanF: 529223 -> 504064
+S14skanM: 372796 -> 353484
+S15lulea: 287842 -> 270891
+S15stoEA: 849292 -> 756320
+S15stoLA: 930954 -> 791443
+S15stoMJ: 848408 -> 748594
+S15sunds: 248964 -> 231117
+S15umea: 304491 -> 281571
+
+#Around 5-8% of contigs are filtered out.
+
 #We now have filtered out contigs that aligned to the reference genome, from these new accesory contigs we can now put them into Kraken2/blobtools to filter out contaminants.
 
