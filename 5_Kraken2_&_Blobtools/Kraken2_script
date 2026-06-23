@@ -8,5 +8,5 @@ tar -xzf v2.17.1.tar.gz
 cd kraken2-2.17.1
 ./install_kraken2.sh /mnt/griffin/marvi/Kraken2
 
-#Build the standard database (includes archaea, bacteria [incl. Wolbachia], viral, plasmid, human, UniVec_Core):
-nohup /mnt/griffin/marvi/Kraken2/kraken2-build --standard --use-ftp --db /mnt/griffin/marvi/Kraken2/db --threads 16 &
+#Download standard database via web (couldn't use rsync och FTP as network rejected it):
+nohup bash -c 'cd /mnt/griffin/marvi/Kraken2 && wget https://genome-idx.s3.amazonaws.com/kraken/k2_standard_20260226.tar.gz && mkdir -p db && tar -xzf k2_standard_20260226.tar.gz -C db' &
