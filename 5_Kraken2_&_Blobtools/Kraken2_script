@@ -37,3 +37,6 @@ nohup bash -c 'ls accessory_contigs_filtered/*_accessory_contigs.fasta | xargs -
     accessory_contigs_filtered/{}_accessory_contigs.fasta"' &
 
 #Now we can move on to using Blobtools.
+
+#Bonus, useful command to view downloadning status:
+tail -5 nohup.out
