@@ -1,0 +1,39 @@
+####################################################################################################################################################
+#Begin by making a new directory:
+mkdir BlobToolKit
+
+#Then install Blobtools:
+pip install blobtoolkit==3.3.2 --break-system-packages
+
+#Check if it installed:
+blobtools -h
+
+####################################################################################################################################################
+#I will have to use the full contigs from the metaSPAdes output containing both mapped and unmapped contigs, in additon to using the P.napi refrence genome.
+
+#Soft link the necessary files:
+ln -s /mnt/griffin/marvi/minimap2/contigs_renamed .
+ln -s /mnt/griffin/marvi/Mapping/GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna .
+
+
+
+
+
+
+#OBS! Unsure about this look into this:
+
+####################################################################################################################################################
+#Get the NCBI taxonomy dump (required for taxonomic annotation in BlobToolKit):
+mkdir taxdump
+cd taxdump
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz
+tar -xzf new_taxdump.tar.gz
+cd ..
+
+####################################################################################################################################################
+#Set up BLASTN against NCBI nt - check if nt database already exists somewhere on duke first:
+find /mnt/griffin -iname "*nt*" -type d 2>/dev/null
+find /data -iname "nt.*" 2>/dev/null
+
+#If not found, will need to download (this is very large, 500GB+) - check disk space first:
+df -h /mnt/griffin
