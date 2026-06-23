@@ -40,3 +40,5 @@ nohup bash -c 'ls accessory_contigs_filtered/*_accessory_contigs.fasta | xargs -
 
 #Bonus, useful command to view downloadning status:
 tail -5 nohup.out
+
+####
