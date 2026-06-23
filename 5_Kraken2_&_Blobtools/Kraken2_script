@@ -1,3 +1,4 @@
+########################################################################################################################
 #Begin by soft linking the accesory contigs generated from the minimap2 part of analysis:
 ln -s /mnt/griffin/marvi/minimap2/accessory_contigs_filtered /mnt/griffin/marvi/Kraken2/
 
@@ -10,3 +11,29 @@ cd kraken2-2.17.1
 
 #Download standard database via web (couldn't use rsync och FTP as network rejected it):
 nohup bash -c 'cd /mnt/griffin/marvi/Kraken2 && wget https://genome-idx.s3.amazonaws.com/kraken/k2_standard_20260226.tar.gz && mkdir -p db && tar -xzf k2_standard_20260226.tar.gz -C db' &
+
+##########################################################################################################################
+#Now to run Kraken2 on the contigs:
+
+#Make a directory for the output:
+mkdir -p kraken2_output
+
+#Now for the Kraken2 dryun command:
+ls accessory_contigs_filtered/*_accessory_contigs.fasta | xargs -n1 basename -s "_accessory_contigs.fasta" | parallel --dryrun -j 2 \
+    "/mnt/griffin/marvi/Kraken2/kraken2 \
+    --db /mnt/griffin/marvi/Kraken2/db \
+    --threads 8 \
+    --output kraken2_output/{}.kraken \
+    --report kraken2_output/{}.report \
+    accessory_contigs_filtered/{}_accessory_contigs.fasta"
+
+#And now the real Kraken2 command:
+nohup bash -c 'ls accessory_contigs_filtered/*_accessory_contigs.fasta | xargs -n1 basename -s "_accessory_contigs.fasta" | parallel -j 2 \
+    "/mnt/griffin/marvi/Kraken2/kraken2 \
+    --db /mnt/griffin/marvi/Kraken2/db \
+    --threads 8 \
+    --output kraken2_output/{}.kraken \
+    --report kraken2_output/{}.report \
+    accessory_contigs_filtered/{}_accessory_contigs.fasta"' &
+
+#Now we can move on to using Blobtools.
