@@ -34,4 +34,4 @@ done
 multiqc /mnt/griffin/marvi/Mapping/sorted_bam_files -o /mnt/griffin/marvi/MultiQC
 
 #Then download multiQC report to local computer:
-scp marvi@duke.zoologi.su.se:/mnt/griffin/marvi/MultiQC/multiqc_report_1.html .
+scp marvi@duke.zoologi.su.se:/mnt/griffin/marvi/MultiQC/multiqc_report_2.html .
