@@ -1,0 +1,7 @@
+# byobu-disable
+# invoke this, 
+byobu-enable
+# logout, come back
+
+# then when you type F2, it will open a new tab in your command line app, so you have as many tabs as you want. you can run 
+# separate commands in different tabs. Close tab with ctrl-d, cycle through tabs with F3.
