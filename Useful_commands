@@ -5,3 +5,10 @@ byobu-enable
 
 # then when you type F2, it will open a new tab in your command line app, so you have as many tabs as you want. you can run 
 # separate commands in different tabs. Close tab with ctrl-d, cycle through tabs with F3.
+
+#To view file sizes:
+ls -lh
+
+#To run a job without cancelling with terminal closing:
+nohup *JOB* &
+
