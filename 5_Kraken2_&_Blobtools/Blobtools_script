@@ -1,39 +1,172 @@
 ####################################################################################################################################################
-#Begin by making a new directory:
-mkdir BlobToolKit
+#BlobToolKit installation - troubleshooting log and fix
+####################################################################################################################################################
 
-#Then install Blobtools:
-pip install blobtoolkit==3.3.2 --break-system-packages
+#Initial attempt: pip install into system Python (3.7) under base/system environment - caused issues
+#since blobtoolkit kept resolving to incompatible versions, and the 'blobtools' CLI module was
+#sometimes missing depending on version (known packaging issue, see github.com/genomehubs/blobtoolkit/issues/192)
 
-#Check if it installed:
+#ISSUE DISCOVERED: an existing conda environment called "btk" (set up previously with Chris) was found,
+#but on inspection it was broken - despite (btk) showing as active, 'which python3' and 'which pip'
+#both resolved to system paths (python3.7 / /usr/local/bin/pip), meaning the environment was never
+#properly isolated. The btk env also had no actual python3 binary present in its own bin/ directory.
+
+conda env list
+#Showed: base -> /mnt/griffin/marvi/mini ; btk -> /mnt/griffin/marvi/m/envs/btk
+
+conda activate btk
+which python3        #returned a path, but binary didn't actually exist
+which pip             #returned /usr/local/bin/pip - WRONG, this is system pip, not the env's pip
+pip --version         #confirmed: pip 24.0 from python 3.7 - confirms btk env was broken/incomplete
+
+#FIX: remove the broken btk environment entirely and rebuild it properly with an explicit Python version pin
+conda deactivate
+conda env remove -n btk -y
+conda create -n btk -y python=3.9
+conda activate btk
+
+#Verify the new environment is genuinely isolated this time:
+which python3    # -> /mnt/griffin/marvi/m/envs/btk/bin/python3
+python3 --version # -> Python 3.9.25
+which pip         # -> /mnt/griffin/marvi/m/envs/btk/bin/pip
+pip --version     # -> pip 26.0.1 from .../envs/btk/lib/python3.9/site-packages (python 3.9)
+#All four checks now correctly point inside /envs/btk/ - environment is properly isolated
+
+#Install BlobToolKit fresh into the clean, working environment:
+pip install blobtoolkit
+#Successfully installed blobtoolkit-4.5.0 (along with blobtk, selenium, and all other dependencies)
+
+#Verify installation:
+pip list | grep -i blob
+which blobtools
 blobtools -h
 
 ####################################################################################################################################################
-#I will have to use the full contigs from the metaSPAdes output containing both mapped and unmapped contigs, in additon to using the P.napi refrence genome.
+#Going forward: always activate the btk environment before running any BlobToolKit commands:
+     conda activate btk
+####################################################################################################################################################
 
-#Soft link the necessary files:
+#Now for the blobtools script:
+
+#Check if blobtools is installed:
+blobtools -h
+
+##################################################################################################################
+
+#Step 1: Generate coverage - map each sample's original reads back to its own full (unfiltered) contigs
+
+conda activate btk
+cd /mnt/griffin/marvi/BlobToolKit
+
+mkdir -p coverage
+cd coverage
+
+#Soft link the full (unfiltered) contigs from metaSPAdes:
 ln -s /mnt/griffin/marvi/minimap2/contigs_renamed .
+
+#Soft link the P.napi reference genome (comparison anchor):
 ln -s /mnt/griffin/marvi/Mapping/GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna .
 
+#Soft link the original CTQ read data (needed for coverage mapping):
+ln -s /mnt/griffin/marvi/CTQ_Read_Data .
 
+#Confirm everything is linked correctly:
+ls -la
 
+cd coverage
 
+#Index each sample's full contigs with bwa-mem2:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index ../contigs_renamed/${sample}_contigs.fasta
+done
 
+#Dryrun the read mapping:
+sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 2 \
+    "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
+    ../contigs_renamed/{2}_contigs.fasta \
+    ../CTQ_Read_Data/{1}_1.ctq.fq.gz \
+    ../CTQ_Read_Data/{1}_2.ctq.fq.gz | \
+    /data/programs/samtools-1.9/samtools sort -@ 6 -o {2}_vs_owncontigs.srt.bam -"
 
-#OBS! Unsure about this look into this:
+#Real command:
+nohup bash -c 'sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t" -j 2 \
+    "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
+    ../contigs_renamed/{2}_contigs.fasta \
+    ../CTQ_Read_Data/{1}_1.ctq.fq.gz \
+    ../CTQ_Read_Data/{1}_2.ctq.fq.gz | \
+    /data/programs/samtools-1.9/samtools sort -@ 6 -o {2}_vs_owncontigs.srt.bam -"' &
 
-####################################################################################################################################################
-#Get the NCBI taxonomy dump (required for taxonomic annotation in BlobToolKit):
-mkdir taxdump
-cd taxdump
-wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz
-tar -xzf new_taxdump.tar.gz
-cd ..
+#Once finhished index BAMS:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    /data/programs/samtools-1.9/samtools index ${sample}_vs_owncontigs.srt.bam
+done
 
-####################################################################################################################################################
-#Set up BLASTN against NCBI nt - check if nt database already exists somewhere on duke first:
+###########################################################################################################################
+
+#Step 2: BLASTN against NCBI nt.
+
 find /mnt/griffin -iname "*nt*" -type d 2>/dev/null
 find /data -iname "nt.*" 2>/dev/null
+find /data/programs -iname "*blast*db*" 2>/dev/null
 
-#If not found, will need to download (this is very large, 500GB+) - check disk space first:
-df -h /mnt/griffin
+##########################################################################################################################
+
+#Step 3:Build Diamond database:
+
+#Build a DIAMOND database from the existing UniProt SwissProt fasta:
+
+mkdir -p /mnt/griffin/marvi/BlobToolKit/diamond_db
+cd /mnt/griffin/marvi/BlobToolKit/diamond_db
+
+#First, get the taxdump if not already done:
+mkdir -p ../taxdump
+cd ../taxdump
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz
+tar -xzf new_taxdump.tar.gz
+cd ../diamond_db
+
+#3b. Download the UniProt accession-to-taxid mapping file.
+#Checked first: confirmed 6.6GB compressed, ~11 min at duke's connection speed - quick enough to just run directly.
+mkdir -p /mnt/griffin/marvi/BlobToolKit/diamond_db
+cd /mnt/griffin/marvi/BlobToolKit/diamond_db
+
+nohup bash -c 'wget -c https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz && \
+    gunzip idmapping_selected.tab.gz && \
+    cut -f 1,13 idmapping_selected.tab > taxid_map.txt' &
+
+#3c. Once the taxid_map.txt has finished downloading, build the DIAMOND database WITH taxonomy mapping:
+/data/programs/diamond_v0.9.10/diamond makedb \
+    --in /data/DB/blast/uniprot/uniprot_sprot.fasta \
+    --taxonmap taxid_map.txt \
+    --taxonnodes ../taxdump/nodes.dmp \
+    --threads 16 \
+    -d uniprot_sprot
+
+#######################################################################################################################
+#Step 4: Run DIAMOND BLASTX against UniProt SwissProt for each sample's contigs
+
+mkdir -p /mnt/griffin/marvi/BlobToolKit/diamond_db/diamond_results
+
+#Dryrun first:
+ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel --dryrun -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query contigs_renamed/{}_contigs.fasta \
+    --db diamond_db/uniprot_sprot.dmnd \
+    --outfmt 6 qseqid staxids bitscore qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-25 \
+    --threads 8 \
+    --out diamond_db/diamond_results/{}_diamond.out"
+
+#Now for the real command:
+nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query contigs_renamed/{}_contigs.fasta \
+    --db diamond_db/uniprot_sprot.dmnd \
+    --outfmt 6 qseqid staxids bitscore qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-25 \
+    --threads 8 \
+    --out diamond_db/diamond_results/{}_diamond.out"' &
