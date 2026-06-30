@@ -75,11 +75,6 @@ ls -la
 
 cd coverage
 
-#Index each sample's full contigs with bwa-mem2:
-for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
-    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index ../contigs_renamed/${sample}_contigs.fasta
-done
-
 #Dryrun the read mapping:
 sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 2 \
     "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
