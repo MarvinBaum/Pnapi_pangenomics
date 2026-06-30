@@ -75,6 +75,11 @@ ls -la
 
 cd coverage
 
+#Index each sample's full contigs with bwa-mem2:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index ../contigs_renamed/${sample}_contigs.fasta
+done
+
 #Dryrun the read mapping:
 sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --dryrun --colsep "\t" -j 2 \
     "/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem -t 8 \
@@ -104,8 +109,6 @@ find /mnt/griffin -iname "*nt*" -type d 2>/dev/null
 find /data -iname "nt.*" 2>/dev/null
 find /data/programs -iname "*blast*db*" 2>/dev/null
 
-#WAIT FOR CONFIRMATION FROM CHRIS!
-
 ##########################################################################################################################
 
 #Step 3:Build Diamond database:
@@ -132,38 +135,78 @@ nohup bash -c 'wget -c https://ftp.uniprot.org/pub/databases/uniprot/current_rel
     cut -f 1,13 idmapping_selected.tab > taxid_map.txt' &
 
 #3c. Once the taxid_map.txt has finished downloading, build the DIAMOND database WITH taxonomy mapping:
-/data/programs/diamond_v0.9.10/diamond makedb \
+nohup /data/programs/diamond_v0.9.10/diamond makedb \
     --in /data/DB/blast/uniprot/uniprot_sprot.fasta \
     --taxonmap taxid_map.txt \
     --taxonnodes ../taxdump/nodes.dmp \
     --threads 16 \
-    -d uniprot_sprot
+    -d uniprot_sprot &
 
 #######################################################################################################################
 #Step 4: Run DIAMOND BLASTX against UniProt SwissProt for each sample's contigs
 
 mkdir -p /mnt/griffin/marvi/BlobToolKit/diamond_db/diamond_results
 
+#Run DIAMOND search WITHOUT staxids (since this old version can't embed taxonomy at makedb time):
+cd /mnt/griffin/marvi/BlobToolKit
+
 #Dryrun first:
 ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel --dryrun -j 2 \
     "/data/programs/diamond_v0.9.10/diamond blastx \
     --query contigs_renamed/{}_contigs.fasta \
     --db diamond_db/uniprot_sprot.dmnd \
-    --outfmt 6 qseqid staxids bitscore qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --outfmt 6 \
     --sensitive \
     --max-target-seqs 1 \
     --evalue 1e-25 \
     --threads 8 \
     --out diamond_db/diamond_results/{}_diamond.out"
 
-#Now for the real command:
+#Now the real command:
 nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel -j 2 \
     "/data/programs/diamond_v0.9.10/diamond blastx \
     --query contigs_renamed/{}_contigs.fasta \
     --db diamond_db/uniprot_sprot.dmnd \
-    --outfmt 6 qseqid staxids bitscore qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --outfmt 6 \
     --sensitive \
     --max-target-seqs 1 \
     --evalue 1e-25 \
     --threads 8 \
     --out diamond_db/diamond_results/{}_diamond.out"' &
+
+#Taxify all DIAMOND results using join (much faster than awk arrays for 149.8M row lookup table)
+
+#join requires both files sorted on the join column first
+sort -k1,1 taxid_map.txt > taxid_map_sorted.txt
+
+#Then the commadn to get taxonomy correct:
+
+nano taxify_diamond_results.sh
+
+#All the following is in a nanoscript:
+
+#!/bin/bash
+
+cd /mnt/griffin/marvi/BlobToolKit/diamond_db
+
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Taxifying $sample..."
+
+    awk -F'\t' '{split($2,p,"|"); print p[2]"\t"$0}' diamond_results/${sample}_diamond.out | sort -k1,1 > /tmp/${sample}_with_acc.txt
+
+    join -t $'\t' -1 1 -2 1 /tmp/${sample}_with_acc.txt taxid_map_sorted.txt | \
+        awk -F'\t' '{print $2"\t"$NF"\t"$13"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t"$13}' \
+        > taxified_results/${sample}_diamond_taxified.out
+
+    rm /tmp/${sample}_with_acc.txt
+
+    echo "$sample: $(wc -l < diamond_results/${sample}_diamond.out) hits -> $(wc -l < taxified_results/${sample}_diamond_taxified.out) taxified"
+
+done
+
+#Run the script:
+nohup bash taxify_diamond_results.sh &
+
+#All outputs for step 4 now in taxified_results.
+
+##############################################################################################################################
