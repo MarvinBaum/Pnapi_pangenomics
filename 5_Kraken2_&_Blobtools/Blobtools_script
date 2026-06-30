@@ -104,6 +104,8 @@ find /mnt/griffin -iname "*nt*" -type d 2>/dev/null
 find /data -iname "nt.*" 2>/dev/null
 find /data/programs -iname "*blast*db*" 2>/dev/null
 
+#WAIT FOR CONFIRMATION FROM CHRIS!
+
 ##########################################################################################################################
 
 #Step 3:Build Diamond database:
