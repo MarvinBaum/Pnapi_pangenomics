@@ -155,7 +155,6 @@ echo "All samples filtered. Clean contigs ready for annotation in contigs_after_
 
 #This was the amount of contamination removed per sample:
 
-> done
 C13stmor: before=332346 | after=327295 | removed=5051
 E12aigua: before=438655 | after=432884 | removed=5771
 S14skanF: before=504064 | after=497184 | removed=6880
@@ -166,7 +165,6 @@ S15stoLA: before=791443 | after=779751 | removed=11692
 S15stoMJ: before=748594 | after=737936 | removed=10658
 S15sunds: before=231117 | after=225120 | removed=5997
 S15umea: before=281571 | after=274052 | removed=7519
-(btk) marvi@duke:/mnt/griffin/marvi/Kraken2$
 
 ############################################################################################################################################################
 
