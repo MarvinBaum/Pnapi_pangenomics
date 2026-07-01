@@ -97,9 +97,20 @@ nohup bash -c 'sed 1d ../CTQ_Read_Data/pool_metadata.tsv | parallel --colsep "\t
     /data/programs/samtools-1.9/samtools sort -@ 6 -o {2}_vs_owncontigs.srt.bam -"' &
 
 #Once finhished index BAMS:
+nano index_coverage_bams.sh
+
+#All of the following in the nanoscript:
+#!/bin/bash
+
 for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Indexing ${sample}..."
     /data/programs/samtools-1.9/samtools index ${sample}_vs_owncontigs.srt.bam
 done
+
+echo "All BAMs indexed."
+
+#Run nanoscript:
+nohup bash index_coverage_bams.sh &
 
 ###########################################################################################################################
 
@@ -109,9 +120,55 @@ find /mnt/griffin -iname "*nt*" -type d 2>/dev/null
 find /data -iname "nt.*" 2>/dev/null
 find /data/programs -iname "*blast*db*" 2>/dev/null
 
+#Make a directory:
+mkdir -p blastn_results
+
+#BLASTN nt database:
+#Found at: /data/DB/blast/nt/nt (confirmed via: find /data -iname "nt.*" 2>/dev/null)
+#Database alias file: /data/DB/blast/nt/nt.nal (dated Dec 2, 2016)
+#Format: 42+ volumes (nt.01 through nt.42+), standard BLAST format
+#Vintage: December 2016 (~10 years old)
+#Note: Acceptable as complementary check alongside Kraken2 Standard database (Feb 2026)
+#which serves as the primary, up-to-date contamination classifier
+
+#Found a 2016 database, lets try a dryrun on it:
+ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel --dryrun -j 2 \
+    "/data/programs/ncbi-blast-2.14.1+/bin/blastn \
+    -task megablast \
+    -query contigs_renamed/{}_contigs.fasta \
+    -db /data/DB/blast/nt/nt \
+    -outfmt '6 qseqid staxids bitscore std' \
+    -max_target_seqs 10 \
+    -max_hsps 1 \
+    -evalue 1e-25 \
+    -num_threads 8 \
+    -out blastn_results/{}_blastn.out"
+
+#Real command:
+nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_contigs.fasta" | parallel -j 2 \
+    "/data/programs/ncbi-blast-2.14.1+/bin/blastn \
+    -task megablast \
+    -query contigs_renamed/{}_contigs.fasta \
+    -db /data/DB/blast/nt/nt \
+    -outfmt '"'"'6 qseqid staxids bitscore std'"'"' \
+    -max_target_seqs 10 \
+    -max_hsps 1 \
+    -evalue 1e-25 \
+    -num_threads 8 \
+    -out blastn_results/{}_blastn.out"' &
+
+#After this we should have our nucleotide taxonomy done.
+
 ##########################################################################################################################
 
 #Step 3:Build Diamond database:
+
+#DATABASE SOURCE:
+#UniProt SwissProt fasta found at: /data/DB/blast/uniprot/uniprot_sprot.fasta
+#Confirmed via: find /data -iname "*uniprot*" 2>/dev/null
+#File size: 255MB, 553,474 protein sequences, dated April 24 2017 (~9 years old)
+#Also available at same location: uniprot_trembl.fasta (larger, automated annotations)
+#alongside Kraken2 Standard database (Feb 2026) which is the primary classifier
 
 #Build a DIAMOND database from the existing UniProt SwissProt fasta:
 
@@ -174,12 +231,18 @@ nohup bash -c 'ls contigs_renamed/*_contigs.fasta | xargs -n1 basename -s "_cont
     --threads 8 \
     --out diamond_db/diamond_results/{}_diamond.out"' &
 
-#Taxify all DIAMOND results using join (much faster than awk arrays for 149.8M row lookup table)
+#IMPORTANT NOTE - DIAMOND v0.9.10 limitation:
+#--taxonmap/--taxonnodes flags are silently ignored at makedb time in this version
+#(only listed under aligner options in --help, not under makedb options)
+#Taxonomy therefore NOT embedded in the .dmnd file despite command completing without error
+#Workaround: taxonomy attached post-search via custom join script (taxify_diamond_results.sh
+
+#FIX: Taxify all DIAMOND results using join (much faster than awk arrays for 149.8M row lookup table)
 
 #join requires both files sorted on the join column first
 sort -k1,1 taxid_map.txt > taxid_map_sorted.txt
 
-#Then the commadn to get taxonomy correct:
+#Then the command to get taxonomy correct:
 
 nano taxify_diamond_results.sh
 
@@ -207,6 +270,71 @@ done
 #Run the script:
 nohup bash taxify_diamond_results.sh &
 
-#All outputs for step 4 now in taxified_results.
+#All outputs for step 4 now in taxified_results. This should give us our taxonomy from a proteomic level.
 
 ##############################################################################################################################
+
+#Step 5: Combine into BlobDirs.
+
+conda activate btk
+mkdir -p blobdirs
+
+#All of this in a nanoscript (called blobdir.sh):
+#!/bin/bash
+
+#Per-sample BlobDirs (10 samples):
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Creating BlobDir for ${sample}..."
+
+    #Create BlobDir from full unfiltered contigs (as per Chris's instruction - not just accessory):
+    blobtools create \
+        --fasta contigs_renamed/${sample}_contigs.fasta \
+        blobdirs/${sample}_BlobDir
+
+    #Add coverage (reads mapped back to own contigs):
+    blobtools add \
+        --cov coverage/${sample}_vs_owncontigs.srt.bam \
+        blobdirs/${sample}_BlobDir
+
+    #Add BLASTN taxonomy hits:
+    blobtools add \
+        --hits blastn_results/${sample}_blastn.out \
+        --taxdump taxdump \
+        blobdirs/${sample}_BlobDir
+
+    #Add DIAMOND taxonomy hits (taxified via custom join script):
+    blobtools add \
+        --hits diamond_db/taxified_results/${sample}_diamond_taxified.out \
+        --taxdump taxdump \
+        blobdirs/${sample}_BlobDir
+
+done
+
+#Run script:
+nohup bash blobdir.sh &
+
+#For the P.napi refrence genome we need to convert it into a "BlobDir format":
+blobtools create \
+    --fasta GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna \
+    blobdirs/RefGenome_BlobDir
+
+#Add coverage using existing reads-vs-reference BAMs from original alignment step:
+blobtools add \
+    --cov /mnt/griffin/marvi/Mapping/sorted_bam_files/C13stmor_v_ilPieNapi1.2.srt.bam \
+    blobdirs/RefGenome_BlobDir
+
+##################################################################################################################################
+
+#Step 6: Visualize in BlobToolKit Viewer.
+
+#Host all BlobDirs (10 samples + reference genome) in the interactive viewer:
+blobtools host blobdirs/
+
+#This launches a local web server - access via browser at the URL provided
+#The blobplot shows each contig as a point with:
+#   X-axis: GC content
+#   Y-axis: coverage depth
+#   Color: taxonomic classification (from BLASTN + DIAMOND combined)
+#Reference genome chromosomes serve as the known-butterfly anchor cluster
+#Contamination should appear as visually distinct clusters away from the reference anchor
+##################################################################################################################################
