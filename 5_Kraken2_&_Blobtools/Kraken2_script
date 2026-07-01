@@ -63,9 +63,99 @@ done
 #This will now give us Krona charts for easier visualization, move this to my local computer to uppload to github:
 scp -r marvi@duke.zoologi.su.se:/mnt/griffin/marvi/Kraken2/kraken2_output/krona_output/* .
 
+##########################################################################################################################
+#Kraken2 contamination filtering - remove contaminated contigs before annotation
+###########################################################################################################################
+
+#Strategy: filter the accessory contigs (post-minimap2) to remove contamination
+#before annotation of the accessory pangenome.
+
+#Contaminants identified from Kraken2 reports:
+#   - Human (taxid 9606) - present in all samples (~1-1.4%)
+#   - Bacteria (taxid 2) - root node covering ALL bacterial contamination:
+#       Delftia spp. (S14skanF, S14skanM)
+#       Rahnella spp. (S15stoEA, S15stoMJ)
+#       Phyllobacterium spp. (S15lulea, S15sunds, S15umea)
+#       Serratia spp. (S15stoEA, S15stoMJ)
+#       Wolbachia spp. (all samples, especially S15lulea 0.45%)
+#       Enterobacteriaceae (most samples)
+
+#Input: accessory_contigs_filtered/{sample}_accessory_contigs.fasta (post-minimap2)
+#Output: contigs_after_minimap_and_kraken/{sample}_filtered_contigs.fasta (ready for annotation)
+
+cd /mnt/griffin/marvi/Kraken2
+
+#Dryrun - check how many contaminant contigs would be removed per sample:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "=== ${sample} ==="
+
+    #Count total accessory contigs:
+    total=$(grep -c ">" accessory_contigs_filtered/${sample}_accessory_contigs.fasta)
+
+    #Count contaminant contigs (classified as human or bacteria):
+    contaminants=$(grep "^C" kraken2_output/${sample}.kraken | \
+        awk '($3==9606) || ($3==2) || ($3==1224) || ($3==28216) || ($3==28211) || \
+             ($3==1236) || ($3==91347) || ($3==80840) || ($3==356) || ($3==953)' | \
+        wc -l)
+
+    clean=$((total - contaminants))
+    echo "Total: $total | Contaminants: $contaminants | Clean: $clean"
+done
+
+#This was the output:
+=== C13stmor ===
+Total: 332346 | Contaminants: 5051 | Clean: 327295
+=== E12aigua ===
+Total: 438655 | Contaminants: 5771 | Clean: 432884
+=== S14skanF ===
+Total: 504064 | Contaminants: 6880 | Clean: 497184
+=== S14skanM ===
+Total: 353484 | Contaminants: 3545 | Clean: 349939
+=== S15lulea ===
+Total: 270891 | Contaminants: 7890 | Clean: 263001
+=== S15stoEA ===
+Total: 756320 | Contaminants: 10626 | Clean: 745694
+=== S15stoLA ===
+Total: 791443 | Contaminants: 11692 | Clean: 779751
+=== S15stoMJ ===
+Total: 748594 | Contaminants: 10658 | Clean: 737936
+=== S15sunds ===
+Total: 231117 | Contaminants: 5997 | Clean: 225120
+=== S15umea ===
+Total: 281571 | Contaminants: 7519 | Clean: 274052
+
+#Real command - extract contaminated contig IDs and filter them out:
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Filtering ${sample}..."
+
+    grep "^C" kraken2_output/${sample}.kraken | \
+        awk '($3==9606) || ($3==2) || ($3==1224) || ($3==28216) || ($3==28211) || \
+             ($3==1236) || ($3==91347) || ($3==80840) || ($3==356) || ($3==953)' | \
+        cut -f2 > /tmp/${sample}_contaminant_ids.txt
+
+    grep ">" accessory_contigs_filtered/${sample}_accessory_contigs.fasta | \
+        sed 's/>//' > /tmp/${sample}_all_ids.txt
+
+    grep -v -F -f /tmp/${sample}_contaminant_ids.txt /tmp/${sample}_all_ids.txt \
+        > /tmp/${sample}_clean_ids.txt
+
+    /data/programs/samtools-1.9/samtools faidx \
+        accessory_contigs_filtered/${sample}_accessory_contigs.fasta \
+        -r /tmp/${sample}_clean_ids.txt \
+        -o contigs_after_minimap_and_kraken/${sample}_filtered_contigs.fasta
+
+    rm /tmp/${sample}_contaminant_ids.txt \
+       /tmp/${sample}_all_ids.txt \
+       /tmp/${sample}_clean_ids.txt
+
+    echo "${sample}: done -> contigs_after_minimap_and_kraken/${sample}_filtered_contigs.fasta"
+done
+
+echo "All samples filtered. Clean contigs ready for annotation in contigs_after_minimap_and_kraken/"
+
+############################################################################################################################################################
+
 #Now we can move on to using Blobtools.
 
 #Bonus, useful command to view downloadning status:
 tail -5 nohup.out
-
-####
