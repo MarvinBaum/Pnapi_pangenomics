@@ -280,48 +280,56 @@ conda activate btk
 mkdir -p blobdirs
 
 #All of this in a nanoscript (called blobdir.sh):
+
 #!/bin/bash
+
+cd /mnt/griffin/marvi/BlobToolKit
+
+#Use full path to blobtools to avoid PATH resolution issues:
+BLOBTOOLS=/mnt/griffin/marvi/mini???/envs/btk/bin/blobtools
+
+mkdir -p blobdirs
 
 #Per-sample BlobDirs (10 samples):
 for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
     echo "Creating BlobDir for ${sample}..."
 
-    #Create BlobDir from full unfiltered contigs (as per Chris's instruction - not just accessory):
-    blobtools create \
+    $BLOBTOOLS create \
         --fasta contigs_renamed/${sample}_contigs.fasta \
         blobdirs/${sample}_BlobDir
 
-    #Add coverage (reads mapped back to own contigs):
-    blobtools add \
+    $BLOBTOOLS add \
         --cov coverage/${sample}_vs_owncontigs.srt.bam \
         blobdirs/${sample}_BlobDir
 
-    #Add BLASTN taxonomy hits:
-    blobtools add \
+    $BLOBTOOLS add \
         --hits blastn_results/${sample}_blastn.out \
         --taxdump taxdump \
         blobdirs/${sample}_BlobDir
 
-    #Add DIAMOND taxonomy hits (taxified via custom join script):
-    blobtools add \
+    $BLOBTOOLS add \
         --hits diamond_db/taxified_results/${sample}_diamond_taxified.out \
         --taxdump taxdump \
         blobdirs/${sample}_BlobDir
 
+    echo "${sample}: BlobDir complete"
 done
 
-#Run script:
-nohup bash blobdir.sh &
+#Reference genome BlobDir:
+echo "Creating BlobDir for reference genome..."
 
-#For the P.napi refrence genome we need to convert it into a "BlobDir format":
-blobtools create \
+$BLOBTOOLS create \
     --fasta GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna \
     blobdirs/RefGenome_BlobDir
 
-#Add coverage using existing reads-vs-reference BAMs from original alignment step:
-blobtools add \
+$BLOBTOOLS add \
     --cov /mnt/griffin/marvi/Mapping/sorted_bam_files/C13stmor_v_ilPieNapi1.2.srt.bam \
     blobdirs/RefGenome_BlobDir
+
+echo "All BlobDirs complete. Ready for visualisation with: blobtools host blobdirs/"
+
+#Run script:
+nohup bash blobdir.sh &
 
 ##################################################################################################################################
 
