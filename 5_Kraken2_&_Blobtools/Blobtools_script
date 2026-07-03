@@ -331,7 +331,18 @@ echo "All BlobDirs complete. Ready for visualisation with: blobtools host blobdi
 #Run script:
 nohup bash blobdir.sh &
 
-#For some reason coverage wasnt added, lets try this:
+#For some reason coverage wasnt added, because it needs csi format:
+cd /mnt/griffin/marvi/BlobToolKit/coverage
+
+nohup bash -c 'for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Creating CSI index for ${sample}..."
+    /data/programs/samtools-1.9/samtools index -c -@ 8 ${sample}_vs_owncontigs.srt.bam
+    echo "${sample}: done"
+done
+echo "All CSI indexes created."' &
+
+#Now lets try add coverage:
+
 cd /mnt/griffin/marvi/BlobToolKit
 
 nohup bash -c '
@@ -342,11 +353,13 @@ for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15
         blobdirs/${sample}_BlobDir
     echo "${sample}: coverage added"
 done
+
+#Also add coverage for the reference genome BlobDir:
 echo "Adding coverage for reference genome..."
 /mnt/griffin/marvi/mini???/envs/btk/bin/blobtools add \
     --cov /mnt/griffin/marvi/Mapping/sorted_bam_files/C13stmor_v_ilPieNapi1.2.srt.bam \
     blobdirs/RefGenome_BlobDir
-echo "All coverage added."
+echo "All coverage added. BlobDirs ready for visualisation."
 ' &
 
 ##################################################################################################################################
