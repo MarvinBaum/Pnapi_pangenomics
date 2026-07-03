@@ -331,6 +331,24 @@ echo "All BlobDirs complete. Ready for visualisation with: blobtools host blobdi
 #Run script:
 nohup bash blobdir.sh &
 
+#For some reason coverage wasnt added, lets try this:
+cd /mnt/griffin/marvi/BlobToolKit
+
+nohup bash -c '
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Adding coverage for ${sample}..."
+    /mnt/griffin/marvi/mini???/envs/btk/bin/blobtools add \
+        --cov coverage/${sample}_vs_owncontigs.srt.bam \
+        blobdirs/${sample}_BlobDir
+    echo "${sample}: coverage added"
+done
+echo "Adding coverage for reference genome..."
+/mnt/griffin/marvi/mini???/envs/btk/bin/blobtools add \
+    --cov /mnt/griffin/marvi/Mapping/sorted_bam_files/C13stmor_v_ilPieNapi1.2.srt.bam \
+    blobdirs/RefGenome_BlobDir
+echo "All coverage added."
+' &
+
 ##################################################################################################################################
 
 #Step 6: Visualize in BlobToolKit Viewer.
