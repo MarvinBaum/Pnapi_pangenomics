@@ -373,14 +373,25 @@ echo "All BlobToolKit steps complete. Ready for visualisation."
 
 #Step 6: Visualize in BlobToolKit Viewer.
 
-#Host all BlobDirs (10 samples + reference genome) in the interactive viewer:
-blobtools host blobdirs/
+cd /mnt/griffin/marvi/BlobToolKit
 
-#This launches a local web server - access via browser at the URL provided
-#The blobplot shows each contig as a point with:
-#   X-axis: GC content
-#   Y-axis: coverage depth
-#   Color: taxonomic classification (from BLASTN + DIAMOND combined)
-#Reference genome chromosomes serve as the known-butterfly anchor cluster
-#Contamination should appear as visually distinct clusters away from the reference anchor
+nohup bash -c '
+BLOBTOOLS=$'"'"'/mnt/griffin/marvi/mini\b\b\b/envs/btk/bin/blobtools'"'"'
+
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Generating plot for ${sample}..."
+    $BLOBTOOLS view \
+        --plot \
+        --view blob \
+        --format png \
+        --out blobdirs_vis/ \
+        blobdirs/${sample}_BlobDir
+    echo "${sample}: done"
+done
+echo "All plots generated."
+' &
+
+#After download files to local computer:
+
+
 ##################################################################################################################################
