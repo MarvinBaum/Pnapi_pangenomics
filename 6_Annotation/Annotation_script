@@ -24,13 +24,97 @@ done
 #Step 1: RepeatMasker.
 #This tools hides transposable elements from our data, allowing us to focus on the genes.
 
+#We will use a Heliconius repeat library to extract the repeats from our data (found one on duke).
+#Library: Heliconius melpomene repeat library (Hmel2) - closest available Lepidoptera library on duke.
+#This is appropriate since repeat element superfamilies (LINEs, SINEs, DNA transposons, Helitrons) are broadly conserved across Lepidoptera.
 
+#Create output direcotory:
+mkdir -p /mnt/griffin/marvi/Annotation/repeatmasker_output
+
+#Then test the command:
+
+export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+
+nohup /data/programs/RepeatMasker/RepeatMasker \
+    -lib /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
+    -pa 16 \
+    -xsmall \
+    -dir /mnt/griffin/marvi/Annotation/repeatmasker_output/ \
+    /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/C13stmor_1kb_contigs.fasta &
+
+#Do this for the other samples now:
+
+cd /mnt/griffin/marvi/Annotation
+
+export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+
+nohup bash -c '
+export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+
+for sample in E12aigua S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Running RepeatMasker for ${sample}..."
+    /data/programs/RepeatMasker/RepeatMasker \
+        -lib /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
+        -pa 16 \
+        -xsmall \
+        -dir /mnt/griffin/marvi/Annotation/repeatmasker_output/ \
+        /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/${sample}_1kb_contigs.fasta
+    echo "${sample}: done"
+done
+echo "All RepeatMasker jobs complete."
+' &
+
+##################################################################################################################################################################################
+#Optional: Build de novo P.napi repeat library with RepeatModeler for more accurate masking:
+#/data/programs/RepeatModeler/BuildDatabase \
+#    -name pieris_napi \
+#    -engine ncbi \
+#    /data/DB/annotation/DAS/Pnap/Pieris_napi.allpaths.scaffolds.fa
+#
+#/data/programs/RepeatModeler/RepeatModeler \
+#    -database pieris_napi \
+#    -pa 16
+##################################################################################################################################################################################
 
 ###################################################################################################################################################################################
 
 #Step 2: Diamond blastx.
 #We will use diamond blastx to compare the contigs against the NCBI database.
 
+mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation
+mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results
+
+#Build DIAMOND database from P.napi proteins (one-time, quick):
+/data/programs/diamond_v0.9.10/diamond makedb \
+    --in /data/DB/annotation/DAS/Pnap/genome_annotation_v1/fasta/pienap_proteins.fa \
+    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins \
+    --threads 16
+
+#Dryrun first:
+ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked \
+    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results/{}_diamond_pnapi.out"
+
+#Real command:
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked \
+    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results/{}_diamond_pnapi.out"' &
 
 ####################################################################################################################################################################################
 
@@ -42,6 +126,25 @@ done
 
 #Step 4: Gene prediction using Augustus.
 
+mkdir -p /mnt/griffin/marvi/Annotation/augustus_output
+
+#Dryrun first:
+ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
+    "/data/programs/augustus-3.3.3/bin/augustus \
+    --species=heliconius_melpomene1 \
+    --gff3=on \
+    --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
+    /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked"
+
+#Real command:
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
+    "/data/programs/augustus-3.3.3/bin/augustus \
+    --species=heliconius_melpomene1 \
+    --gff3=on \
+    --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
+    /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked"' &
 
 
 ######################################################################################################################################################################################
