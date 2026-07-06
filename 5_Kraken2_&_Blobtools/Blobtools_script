@@ -465,4 +465,11 @@ done
 echo "All done. Plots in blobdirs_vis/"
 
 #Run it:
-nohup bash combined_blobdirs.sh &
+
+#Saw from Repeatmasker that the Skane samples were still contaminated even after Kraken2, we can use blobtools to fix this:
+BLOBTOOLS=$'/mnt/griffin/marvi/mini\b\b\b/envs/btk/bin/blobtools'
+$BLOBTOOLS filter \
+    --param gc--Max=0.50 \
+    --fasta contigs_for_annotation_1kb/S14skanF_1kb_contigs.fasta \
+    --output Annotation/S14skanF_gcfiltered \
+    BlobToolKit/blobdirs/S14skanF_BlobDir
