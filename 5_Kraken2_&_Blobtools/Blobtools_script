@@ -395,3 +395,74 @@ echo "All plots generated."
 
 
 ##################################################################################################################################
+
+#Okay I think I did it wrong we need to map the contigs to the refrence with this workflow:
+
+#Create new script:
+nano combined_blobdirs.sh
+
+#Contains this:
+#!/bin/bash
+
+BLOBTOOLS=$'/mnt/griffin/marvi/mini\b\b\b/envs/btk/bin/blobtools'
+
+cd /mnt/griffin/marvi/BlobToolKit
+
+mkdir -p combined
+mkdir -p blobdirs_combined
+
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "=== Processing ${sample} ==="
+
+    echo "${sample}: combining fastas..."
+    cat contigs_renamed/${sample}_contigs.fasta \
+        GCF_905475465.1_ilPieNapi1.2_genomic.renamed.fna \
+        > combined/${sample}_plus_ref.fasta
+
+    echo "${sample}: creating BlobDir..."
+    $BLOBTOOLS create \
+        --fasta combined/${sample}_plus_ref.fasta \
+        blobdirs_combined/${sample}_combined_BlobDir
+
+    echo "${sample}: adding contig coverage..."
+    $BLOBTOOLS add \
+        --cov coverage/${sample}_vs_owncontigs.srt.bam \
+        blobdirs_combined/${sample}_combined_BlobDir
+
+    echo "${sample}: adding reference coverage..."
+    $BLOBTOOLS add \
+        --cov /mnt/griffin/marvi/Mapping/sorted_bam_files/${sample}_v_ilPieNapi1.2.srt.bam \
+        blobdirs_combined/${sample}_combined_BlobDir
+
+    echo "${sample}: adding BLASTN hits..."
+    $BLOBTOOLS add \
+        --hits blastn_results/${sample}_blastn.out \
+        --taxdump taxdump \
+        blobdirs_combined/${sample}_combined_BlobDir
+
+    echo "${sample}: adding DIAMOND hits..."
+    $BLOBTOOLS add \
+        --hits diamond_db/taxified_results/${sample}_diamond_taxified.out \
+        --taxdump taxdump \
+        blobdirs_combined/${sample}_combined_BlobDir
+
+    echo "${sample}: complete"
+done
+
+echo "All combined BlobDirs created. Generating plots..."
+
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Plotting ${sample}..."
+    $BLOBTOOLS view \
+        --plot \
+        --view blob \
+        --format png \
+        --out blobdirs_vis/ \
+        blobdirs_combined/${sample}_combined_BlobDir
+    echo "${sample}: plot done"
+done
+
+echo "All done. Plots in blobdirs_vis/"
+
+#Run it:
+nohup bash combined_blobdirs.sh &
