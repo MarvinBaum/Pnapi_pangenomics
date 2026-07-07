@@ -81,107 +81,84 @@ nohup /data/programs/RepeatModeler/RepeatModeler \
     -database pieris_napi \
     -pa 8 &
 
-###################################################################################################################################################################################
-#Step 1c: Rerun RepeatMasker with combined Heliconius + de novo P.napi library
-#Combine both libraries first:
-cat /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
-    /mnt/griffin/marvi/Annotation/repeatmodeler_output/pieris_napi-families.fa \
-    > /mnt/griffin/marvi/Annotation/combined_repeat_library.fa
+#OBS! Repeatmodeler didnt really work as there was a lot of dependices needed for installment of newer version.
+#Tried it with old version but ran into a known error associated with these old version (exit code 768).
+#Judging by the results from repeatmasker, we saw very low amount of TEs so I would think this step with repeatmasker should be sufficent.
 
-#Rerun RepeatMasker with combined library on all samples:
-mkdir -p /mnt/griffin/marvi/Annotation/repeatmasker_output_combined
-
-nohup bash -c '
-export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
-
-for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
-    echo "Running RepeatMasker (combined library) for ${sample}..."
-    /data/programs/RepeatMasker/RepeatMasker \
-        -lib /mnt/griffin/marvi/Annotation/combined_repeat_library.fa \
-        -pa 16 \
-        -xsmall \
-        -dir /mnt/griffin/marvi/Annotation/repeatmasker_output_combined/ \
-        /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/${sample}_1kb_contigs.fasta
-    echo "${sample}: done"
-done
-echo "All RepeatMasker (combined library) jobs complete."
-' &
 ##################################################################################################################################################################################
-#Step 2: DIAMOND blastx annotation
-#Two-step approach:
-#   2a: Search against P.napi reference proteins (species-specific, 26,473 proteins)
-#       - Identifies accessory contigs homologous to known P.napi genes
-#   2b: Search against UniProt SwissProt (broader taxonomic context)
-#       - For contigs with no P.napi hit - identifies novel sequences with homologs elsewhere
-#       - SwissProt results already available from BlobToolKit step
+##################################################################################################################################################################################
+#Step 2: DIAMOND blastx annotation - two-tier approach
 #
-#Input: repeat-masked contigs from Step 1 (*.masked files)
-#Database 1: P.napi reference proteins found on duke:
-#            /data/DB/annotation/DAS/Pnap/genome_annotation_v1/fasta/pienap_proteins.fa
-#Database 2: UniProt SwissProt (already built during BlobToolKit step):
-#            /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd
+#Biological rationale:
+#Accessory contigs are by definition absent from the P.napi reference genome at the nucleotide
+#level (filtered by minimap2). However, they may still share protein-level homology with
+#reference genes (divergent alleles, paralogs, population-specific variants). We search against
+#two databases in sequence:
+#
+#Tier 1: P.napi reference proteins - current annotation (2022) matching reference genome
+#        GCF_905475465.1_ilPieNapi1.2 used throughout this pipeline
+#        23,367 proteins downloaded from NCBI FTP April 2022
+#        GO annotations updated November 2023
+#        Downloaded: /mnt/griffin/marvi/Annotation/GCF_905475465.1_ilPieNapi1.2_protein.faa
+#        Previously used 2015 DAS annotation (pienap_proteins.fa, 26,473 proteins) - replaced
+#        by this current annotation matching the actual reference genome used in this study
+#
+#Tier 2: UniProt SwissProt (broader taxonomic context)
+#        For contigs with no P.napi hit - identifies novel sequences with homologs elsewhere
+#        Subdivides novel contigs: conserved insect genes, contamination, HGT, genuinely novel
+#        Database: /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd (April 2017)
+#        Note: 2017 vintage - update recommended for publication but acceptable for first pass
+#
+#Input: repeat-masked contigs from Step 1 (*.masked files, Heliconius library)
+#evalue 1e-5: relaxed threshold appropriate for intraspecific/paralog comparisons
+#             (less strict than 1e-25 used for contamination screening in BlobToolKit)
 ##################################################################################################################################################################################
 
-mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation
-mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_pnapi
-mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_sprot
+cd /mnt/griffin/marvi/Annotation
 
-#Build DIAMOND database from P.napi proteins (one-time, quick):
+mkdir -p diamond_annotation/diamond_results_pnapi_v2
+mkdir -p diamond_annotation/diamond_results_sprot
+
+#Build DIAMOND database from current P.napi reference proteins:
 /data/programs/diamond_v0.9.10/diamond makedb \
-    --in /data/DB/annotation/DAS/Pnap/genome_annotation_v1/fasta/pienap_proteins.fa \
-    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins \
+    --in GCF_905475465.1_ilPieNapi1.2_protein.faa \
+    --db diamond_annotation/pienap_ilPieNapi1.2_proteins \
     --threads 16
 
 ##################################################################################################################################################################################
-#Step 2a: DIAMOND blastx vs P.napi reference proteins
+#Tier 1: DIAMOND blastx vs current P.napi reference proteins (GCF_905475465.1_ilPieNapi1.2)
 ##################################################################################################################################################################################
 
 #Dryrun first:
-ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+ls repeatmasker_output/*_1kb_contigs.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
     "/data/programs/diamond_v0.9.10/diamond blastx \
-    --query /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked \
-    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins.dmnd \
+    --query repeatmasker_output/{}_1kb_contigs.fasta.masked \
+    --db diamond_annotation/pienap_ilPieNapi1.2_proteins.dmnd \
     --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
     --sensitive \
     --max-target-seqs 1 \
     --evalue 1e-5 \
     --threads 8 \
-    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_pnapi/{}_diamond_pnapi.out"
+    --out diamond_annotation/2022_diamond_results/{}_diamond_pnapi_2022.out"
 
 #Real command:
-nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+nohup bash -c 'ls repeatmasker_output/*_1kb_contigs.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
     "/data/programs/diamond_v0.9.10/diamond blastx \
-    --query /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked \
-    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_proteins.dmnd \
+    --query repeatmasker_output/{}_1kb_contigs.fasta.masked \
+    --db diamond_annotation/pienap_ilPieNapi1.2_proteins.dmnd \
     --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
     --sensitive \
     --max-target-seqs 1 \
     --evalue 1e-5 \
     --threads 8 \
-    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_pnapi/{}_diamond_pnapi.out"' &
+    --out diamond_annotation/2022_diamond_results/{}_diamond_pnapi_2022.out"' &
 
 ##################################################################################################################################################################################
-#Step 2b: DIAMOND blastx vs UniProt SwissProt (for contigs with no P.napi hit)
-#Note: SwissProt database already built during BlobToolKit step
-#      Results from BlobToolKit already available in:
-#      /mnt/griffin/marvi/BlobToolKit/diamond_db/taxified_results/
-#      These can be reused directly - no need to rerun unless using masked contigs specifically
-##################################################################################################################################################################################
-
-#Optional: rerun on masked contigs for consistency:
-nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
-    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
-    "/data/programs/diamond_v0.9.10/diamond blastx \
-    --query /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked \
-    --db /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd \
-    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
-    --sensitive \
-    --max-target-seqs 1 \
-    --evalue 1e-5 \
-    --threads 8 \
-    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_sprot/{}_diamond_sprot.out"' &
+#Tier 2: DIAMOND blastx vs UniProt SwissProt
+#Run after Tier 1 completes - gives broader taxonomic/functional context for novel contigs
+#Results already generated in diamond_results_sprot/ - no need to rerun
 ##################################################################################################################################################################################
 
 #Step 3: Functional annotation using Pannzer or eggNOG.
