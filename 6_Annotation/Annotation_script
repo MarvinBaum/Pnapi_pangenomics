@@ -107,7 +107,7 @@ nohup /data/programs/RepeatModeler/RepeatModeler \
 #        For contigs with no P.napi hit - identifies novel sequences with homologs elsewhere
 #        Subdivides novel contigs: conserved insect genes, contamination, HGT, genuinely novel
 #        Database: /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd (April 2017)
-#        Note: 2017 vintage - update recommended for publication but acceptable for first pass
+#        Note: 2017
 #
 #Input: repeat-masked contigs from Step 1 (*.masked files, Heliconius library)
 #evalue 1e-5: relaxed threshold appropriate for intraspecific/paralog comparisons
@@ -158,7 +158,9 @@ nohup bash -c 'ls repeatmasker_output/*_1kb_contigs.fasta.masked | \
 ##################################################################################################################################################################################
 #Tier 2: DIAMOND blastx vs UniProt SwissProt
 #Run after Tier 1 completes - gives broader taxonomic/functional context for novel contigs
-#Results already generated in diamond_results_sprot/ - no need to rerun
+
+
+
 ##################################################################################################################################################################################
 
 #Step 3: Functional annotation using Pannzer or eggNOG.
