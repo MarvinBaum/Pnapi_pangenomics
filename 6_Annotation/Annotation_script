@@ -163,7 +163,19 @@ nohup bash -c 'ls repeatmasker_output/*_1kb_contigs.fasta.masked | \
 
 #Step 3: Functional annotation using Pannzer or eggNOG.
 
+#Install eggNOG:
+conda activate btk
+pip install eggnog-mapper
+emapper.py --version
 
+#Download 50G eggNOG database in new directory:
+mkdir -p /mnt/griffin/marvi/Annotation/eggnog_db
+
+nohup download_eggnog_data.py \
+    --data_dir /mnt/griffin/marvi/Annotation/eggnog_db \
+    -y &
+
+#
 
 #####################################################################################################################################################################################
 
