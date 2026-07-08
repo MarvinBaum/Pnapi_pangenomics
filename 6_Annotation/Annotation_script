@@ -20,73 +20,90 @@ done
 #We will still look at the smaller contigs, but this will reduce the noise for the hopefully larger and more informative contigs.
 
 ##################################################################################################################################################################################
-
-#Step 1: RepeatMasker.
-#This tools hides transposable elements from our data, allowing us to focus on the genes.
-
-#We will use a Heliconius repeat library to extract the repeats from our data (found one on duke).
-#Library: Heliconius melpomene repeat library (Hmel2) - closest available Lepidoptera library on duke.
-#This is appropriate since repeat element superfamilies (LINEs, SINEs, DNA transposons, Helitrons) are broadly conserved across Lepidoptera.
-
-#Create output direcotory:
-mkdir -p /mnt/griffin/marvi/Annotation/repeatmasker_output
-
-#Then test the command:
-
-export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
-
-nohup /data/programs/RepeatMasker/RepeatMasker \
-    -lib /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
-    -pa 16 \
-    -xsmall \
-    -dir /mnt/griffin/marvi/Annotation/repeatmasker_output/ \
-    /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/C13stmor_1kb_contigs.fasta &
-
-#Do this for the other samples now:
+##################################################################################################################################################################################
+#Step 1: RepeatMasker
+#Identifies and soft-masks transposable elements and repetitive sequences in accessory contigs,
+#allowing downstream gene prediction (Augustus) and homology searches to focus on genuine
+#coding sequence.
+#
+#Two rounds of masking performed:
+#
+#Round 1: Heliconius melpomene repeat library (Hmel2, ~2012-2014)
+#         - Closest available Lepidoptera library on duke at time of first run
+#         - Results: ~2.25% masking, but TE families misclassified (defaulted to homo taxonomy)
+#         - Results in: repeatmasker_output/
+#         - Not optimal I searched around a bit on duke at first and this was the one I at first was most optimal as a library..
+#
+#Round 2: Dfam Arthropoda library (Dfam v3.0, built into RepeatMasker), found this online and seemed like a much better choice than what the AI suggested.
+#         - Following Berner et al. 2023 (Pieris mannii genome paper):
+#         - Same approach for sister species P.mannii and P.rapae
+#         - When doing it for C13STmor, I saw anmprovement over Round 1: 2.65% masking, TE families correctly classified
+#           as insect-specific (LINEs, LTR elements, DNA transposons)
+#         - Unclassified repeats dropped from 0.63% to 0.17%
+#         - Species correctly set to arthropoda (not homo), which it was for some reason when I used Heliconius library.
+#         - Results in: repeatmasker_output_arthropoda/ 
+#
+#Note on de novo library:
+#         RepeatModeler v2.0.1 used by Berner et al. 2023 could not be installed on duke
+#         due to dependency conflicts (rmblast, perl-text-soundex incompatible with system).
+#         RepeatModeler v1.0.8 (installed on duke) failed with known RECON module bug
+#         (exit code 768). De novo library construction was therefore really hard to perform and I opted to just use repeatmasker as TE content seemed low anyways.
+#         No P.napi specific repeat library found on duke.
+##################################################################################################################################################################################
 
 cd /mnt/griffin/marvi/Annotation
-
 export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
 
-nohup bash -c '
-export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+##################################################################################################################################################################################
+#Round 1: Heliconius repeat library (COMPLETED - my first time running RepeatMasker, not optimal)
+##################################################################################################################################################################################
 
-for sample in E12aigua S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
-    echo "Running RepeatMasker for ${sample}..."
-    /data/programs/RepeatMasker/RepeatMasker \
-        -lib /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
-        -pa 16 \
-        -xsmall \
-        -dir /mnt/griffin/marvi/Annotation/repeatmasker_output/ \
-        /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/${sample}_1kb_contigs.fasta
-    echo "${sample}: done"
-done
-echo "All RepeatMasker jobs complete."
-' &
+mkdir -p repeatmasker_output
+
+#C13stmor test (confirmed working):
+#nohup /data/programs/RepeatMasker/RepeatMasker \
+    -lib /data/DB/annotation/reference_genomes/Hmel/Hmel2/repeats/Hmel.all.named.final.1-31.lib \
+    -pa 4 \
+    -xsmall \
+    -dir repeatmasker_output/ \
+    contigs_for_annotation_1kb/C13stmor_1kb_contigs.fasta &
+
+#All samples (nano script):
+nano repeatmasker_heliconius.sh
+nohup bash repeatmasker_heliconius.sh &
 
 ##################################################################################################################################################################################
-#Step 1b: Build de novo P.napi library using RepeatModeler:
-mkdir -p /mnt/griffin/marvi/Annotation/repeatmodeler_output
-cd /mnt/griffin/marvi/Annotation/repeatmodeler_output
+#Round 2: Arthropoda Dfam library (Second attempt, much better results)
+##################################################################################################################################################################################
 
-#Build RepeatModeler database from P.napi reference genome:
-/data/programs/RepeatModeler/BuildDatabase \
-    -name pieris_napi \
-    -engine ncbi \
-    /data/DB/annotation/DAS/Pnap/Pieris_napi.allpaths.scaffolds.fa
+mkdir -p repeatmasker_output_arthropoda
 
-#Run RepeatModeler to build de novo repeat library:
-#NOTE: This will take several days - run with nohup
-nohup /data/programs/RepeatModeler/RepeatModeler \
-    -database pieris_napi \
-    -pa 8 &
+#Verify -species arthropoda works:
+/data/programs/RepeatMasker/RepeatMasker -species arthropoda 2>&1 | head -3
 
-#OBS! Repeatmodeler didnt really work as there was a lot of dependices needed for installment of newer version.
-#Tried it with old version but ran into a known error associated with these old version (exit code 768).
-#Judging by the results from repeatmasker, we saw very low amount of TEs so I would think this step with repeatmasker should be sufficent.
+#
+
+#All remaining samples via nanoscript (repeatmasker_arthropoda.sh):
+#Contents of repeatmasker_arthropoda.sh:
+   #!/bin/bash
+   export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+   cd /mnt/griffin/marvi/Annotation
+   for sample in E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+       echo "Running RepeatMasker (Arthropoda) for ${sample}..."
+       /data/programs/RepeatMasker/RepeatMasker \
+           -species arthropoda \
+           -pa 4 \
+           -xsmall \
+           -dir repeatmasker_output_arthropoda/ \
+           contigs_for_annotation_1kb/${sample}_1kb_contigs.fasta
+       echo "${sample}: done"
+   done
+   echo "All RepeatMasker (Arthropoda) jobs complete."
+
+nohup bash repeatmasker_arthropoda.sh &
 
 ##################################################################################################################################################################################
-##################################################################################################################################################################################
+
 #Step 2: DIAMOND blastx annotation - two-tier approach
 #
 #Biological rationale:
@@ -94,7 +111,7 @@ nohup /data/programs/RepeatModeler/RepeatModeler \
 #level (filtered by minimap2). However, they may still share protein-level homology with
 #reference genes (divergent alleles, paralogs, population-specific variants). We search against
 #two databases in sequence:
-#
+
 #Tier 1: P.napi reference proteins - current annotation (2022) matching reference genome
 #        GCF_905475465.1_ilPieNapi1.2 used throughout this pipeline
 #        23,367 proteins downloaded from NCBI FTP April 2022
@@ -102,13 +119,13 @@ nohup /data/programs/RepeatModeler/RepeatModeler \
 #        Downloaded: /mnt/griffin/marvi/Annotation/GCF_905475465.1_ilPieNapi1.2_protein.faa
 #        Previously used 2015 DAS annotation (pienap_proteins.fa, 26,473 proteins) - replaced
 #        by this current annotation matching the actual reference genome used in this study
-#
+
 #Tier 2: UniProt SwissProt (broader taxonomic context)
 #        For contigs with no P.napi hit - identifies novel sequences with homologs elsewhere
 #        Subdivides novel contigs: conserved insect genes, contamination, HGT, genuinely novel
 #        Database: /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd (April 2017)
 #        Note: 2017
-#
+
 #Input: repeat-masked contigs from Step 1 (*.masked files, Heliconius library)
 #evalue 1e-5: relaxed threshold appropriate for intraspecific/paralog comparisons
 #             (less strict than 1e-25 used for contamination screening in BlobToolKit)
@@ -159,7 +176,33 @@ nohup bash -c 'ls repeatmasker_output/*_1kb_contigs.fasta.masked | \
 #Tier 2: DIAMOND blastx vs UniProt SwissProt
 #Run after Tier 1 completes - gives broader taxonomic/functional context for novel contigs
 
+mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation/2022_diamond_results_sprot
 
+#Dryrun first:
+ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked \
+    --db /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/2022_diamond_results_sprot/{}_diamond_sprot.out"
+
+#Real command:
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked \
+    --db /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/2022_diamond_results_sprot/{}_diamond_sprot.out"' &
 
 ##################################################################################################################################################################################
 
@@ -228,34 +271,42 @@ sleep 10
 ps aux | grep emapper | grep -v grep
 cat nohup.out | tail -10
 
-#####################################################################################################################################################################################
+##################################################################################################################################################################################
+#Step 4: Gene prediction using Augustus
+#
+#Species model: Pnapi_chromosomes2 - P.napi specific trained model
+#Found in Augustus 3.2.1 on duke: /data/programs/augustus-3.2.1/config/species/Pnapi_chromosomes2
+#Trained on P.napi chromosome-level reference genome (GCF_905475465.1_ilPieNapi1.2)
+#This is the most appropriate model available - same species as study organism
+#Also available: Pnapi_chromosomes (first training), Prapae_N902 (P.rapae sister species)
+#
+#Input: repeat-masked contigs from RepeatMasker Arthropoda run (*.masked files)
+#       located in: /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/
+#Output: GFF3 gene prediction files per sample
 
-#Step 4: Gene prediction using Augustus.
-
+#Make new directory:
 mkdir -p /mnt/griffin/marvi/Annotation/augustus_output
 
 #Dryrun first:
-ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
-    "/data/programs/augustus-3.3.3/bin/augustus \
-    --species=heliconius_melpomene1 \
+    "/data/programs/augustus-3.2.1/bin/augustus \
+    --species=Pnapi_chromosomes2 \
     --gff3=on \
     --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
-    /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked"
+    /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked"
 
 #Real command:
-nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output/*_1kb_contigs.fasta.masked | \
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
-    "/data/programs/augustus-3.3.3/bin/augustus \
-    --species=heliconius_melpomene1 \
+    "/data/programs/augustus-3.2.1/bin/augustus \
+    --species=Pnapi_chromosomes2 \
     --gff3=on \
     --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
-    /mnt/griffin/marvi/Annotation/repeatmasker_output/{}_1kb_contigs.fasta.masked"' &
-
-
+    /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked"' &
 ######################################################################################################################################################################################
 
-#Step 5: Compile a annoation table.
+#Step 5: Compile an annotation table.
 
 
 
