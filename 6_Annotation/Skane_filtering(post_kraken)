@@ -1,0 +1,24 @@
+#Even after Kraken2 skane samples demonstrate high levels of contamitation seen from high GC-content in blobtools and high %s of TEs from RepeatMasker.
+
+#Solution:
+cd /mnt/griffin/marvi/BlobToolKit
+
+BLOBTOOLS=$'/mnt/griffin/marvi/mini\b\b\b/envs/btk/bin/blobtools'
+
+#Filter S14skanF:
+$BLOBTOOLS filter \
+    --param gc--Max=0.50 \
+    --fasta /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/S14skanF_1kb_contigs.fasta \
+    --output /mnt/griffin/marvi/Annotation/skane_gcfiltered/S14skanF_gcfiltered \
+    blobdirs/S14skanF_BlobDir
+
+#Filter S14skanM:
+$BLOBTOOLS filter \
+    --param gc--Max=0.50 \
+    --fasta /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/S14skanM_1kb_contigs.fasta \
+    --output /mnt/griffin/marvi/Annotation/skane_gcfiltered/S14skanM_gcfiltered \
+    blobdirs/S14skanM_BlobDir
+
+#Check for FASTA output:
+ls /mnt/griffin/marvi/Annotation/skane_gcfiltered/
+ls /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/ | grep filtered
