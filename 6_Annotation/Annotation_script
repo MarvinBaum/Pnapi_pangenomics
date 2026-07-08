@@ -81,7 +81,7 @@ mkdir -p repeatmasker_output_arthropoda
 #Verify -species arthropoda works:
 /data/programs/RepeatMasker/RepeatMasker -species arthropoda 2>&1 | head -3
 
-#
+#It works.
 
 #All remaining samples via nanoscript (repeatmasker_arthropoda.sh):
 #Contents of repeatmasker_arthropoda.sh:
@@ -205,71 +205,83 @@ nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*
     --out /mnt/griffin/marvi/Annotation/diamond_annotation/2022_diamond_results_sprot/{}_diamond_sprot.out"' &
 
 ##################################################################################################################################################################################
+##################################################################################################################################################################################
+#Step 3: Functional annotation using eggNOG-mapper
 
-#Step 3: Functional annotation using Pannzer or eggNOG.
+#eggNOG-mapper v2.1.13 installed in btk conda environment
+#Database: eggNOG v5.0.2 downloaded to /mnt/griffin/marvi/Annotation/eggnog_db/
+#   - eggnog.db (39GB) - main annotation database
+#   - eggnog_proteins.dmnd (8.7GB) - DIAMOND search database
+#   - eggnog.taxa.db (266MB) - taxonomy database
 
-#Install eggNOG:
+#Provides: GO terms, KEGG pathways, COG categories, Pfam domains
+#For ALL contigs (not just those hitting P.napi proteins like Step 2)
+
+#--itype metagenome: appropriate for fragmented Pool-seq assembly
+#                    uses blastx to find protein-coding regions in 6 reading frames
+#-m diamond: DIAMOND search engine (fastest, appropriate for this scale)
+#--cpu 8: 8 threads per job - considerate of other users on duke
+
+#Input: repeat-masked contigs from RepeatMasker Arthropoda run (*.masked files)
+#Output: {sample}_eggnog.emapper.annotations - per-contig functional annotations
+
 conda activate btk
+cd /mnt/griffin/marvi/Annotation
+mkdir -p eggnog_output
+
+#Install eggNOG-mapper:
 pip install eggnog-mapper
 emapper.py --version
 
-#Download 50G eggNOG database in new directory:
-mkdir -p /mnt/griffin/marvi/Annotation/eggnog_db
-
-#Then make script for eggNOG data download:
-nano download_eggnog_db.sh
-
-#All of the below is in a nanoscript:
-#!/bin/bash
-
-cd /mnt/griffin/marvi/Annotation/eggnog_db
-
-echo "Downloading eggNOG database files..."
-
-#Main annotation database (~9GB uncompressed):
-wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.db.gz
-echo "eggnog.db.gz downloaded"
-
-#DIAMOND protein database (~4GB uncompressed):
-wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog_proteins.dmnd.gz
-echo "eggnog_proteins.dmnd.gz downloaded"
-
-#Taxonomy database:
-wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.taxa.tar.gz
-echo "eggnog.taxa.tar.gz downloaded"
-
-#Decompress:
-echo "Decompressing..."
-gunzip eggnog.db.gz
-gunzip eggnog_proteins.dmnd.gz
-tar -xzf eggnog.taxa.tar.gz
-rm eggnog.taxa.tar.gz
-
-echo "All eggNOG database files ready."
-ls -lh /mnt/griffin/marvi/Annotation/eggnog_db/
-
-#Run the script:
+#Download database (already done):
 nohup bash download_eggnog_db.sh &
 
-#Now for the eggNOG command:
+#Verify database is ready:
+ls -lh eggnog_db/
+emapper.py --data_dir eggnog_db/ --version
 
-mkdir -p eggnog_output
+#Dryrun - confirm all masked files exist:
+ls repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | wc -l
 
-#Lets try first test with C13stmor:
-
+#Test on C13stmor first:
 nohup emapper.py \
-    -i repeatmasker_output/C13stmor_1kb_contigs.fasta.masked \
+    -i repeatmasker_output_arthropoda/C13stmor_1kb_contigs.fasta.masked \
     --itype metagenome \
     --data_dir /mnt/griffin/marvi/Annotation/eggnog_db/ \
     --output C13stmor_eggnog \
     --output_dir eggnog_output/ \
-    --cpu 16 \
+    --cpu 8 \
     -m diamond \
     --override &
 
-sleep 10
-ps aux | grep emapper | grep -v grep
-cat nohup.out | tail -10
+#Check C13stmor output:
+#ls -lh eggnog_output/
+#head -5 eggnog_output/C13stmor_eggnog.emapper.annotations
+
+#Once C13stmor confirmed working - run all samples via nanoscript.
+#Nanoscript contains this:
+#!/bin/bash
+
+cd /mnt/griffin/marvi/Annotation
+
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Running eggNOG-mapper for ${sample}..."
+    emapper.py \
+        -i repeatmasker_output_arthropoda/${sample}_1kb_contigs.fasta.masked \
+        --itype metagenome \
+        --data_dir /mnt/griffin/marvi/Annotation/eggnog_db/ \
+        --output ${sample}_eggnog \
+        --output_dir eggnog_output/ \
+        --cpu 8 \
+        -m diamond \
+        --override
+    echo "${sample}: done"
+done
+
+echo "All eggNOG-mapper jobs complete."
+
+#Run script:
+nohup bash eggnog_run.sh &
 
 ##################################################################################################################################################################################
 #Step 4: Gene prediction using Augustus
@@ -306,8 +318,142 @@ nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*
     /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked"' &
 ######################################################################################################################################################################################
 
-#Step 5: Compile an annotation table.
+#Step 5: Compile annotation table
 
+#Combines per-contig results from all annotation steps into a single master table:
+#   - Contig ID, length, GC content, coverage
+#   - Repeat fraction (from RepeatMasker Arthropoda)
+#   - P.napi protein hit (from DIAMOND Tier 1 2022)
+#   - SwissProt hit (from DIAMOND Tier 2)
+#   - eggNOG functional annotation (GO terms, KEGG, COG, Pfam)
+#   - Augustus gene prediction (yes/no, number of predicted genes)
+#   - Population/sample
+
+#Input files per sample:
+#   repeatmasker_output_arthropoda/{sample}_1kb_contigs.fasta.tbl     ← repeat stats
+#   diamond_annotation/2022_diamond_results/{sample}_diamond_pnapi_2022.out  ← Tier 1
+#   diamond_annotation/diamond_results_sprot_DAS2015/{sample}_diamond_sprot.out ← Tier 2
+#   eggnog_output/{sample}_eggnog.emapper.annotations                 ← functional
+#   augustus_output/{sample}_genes.gff3                               ← gene predictions
+
+#Make new directory for compiled annotation table:
+cd /mnt/griffin/marvi/Annotation
+mkdir -p annotation_table
+
+#Compile per-sample annotation table using Python:
+nano compile_annotation_table.py
+
+#Nanoscript contents:
+#!/usr/bin/env python3
+
+#compile_annotation_table.py
+#Compiles per-contig annotation table from all annotation steps
+
+import os
+import csv
+from Bio import SeqIO
+
+samples = ['C13stmor', 'E12aigua', 'S14skanF', 'S14skanM', 'S15lulea',
+           'S15stoEA', 'S15stoLA', 'S15stoMJ', 'S15sunds', 'S15umea']
+
+base_dir = '/mnt/griffin/marvi/Annotation'
+
+for sample in samples:
+    print(f"Processing {sample}...")
+
+    #Output file:
+    outfile = f"{base_dir}/annotation_table/{sample}_annotation_table.tsv"
+
+    #Load contig lengths and GC from masked FASTA:
+    contigs = {}
+    fasta = f"{base_dir}/repeatmasker_output_arthropoda/{sample}_1kb_contigs.fasta.masked"
+    for rec in SeqIO.parse(fasta, 'fasta'):
+        seq = str(rec.seq).upper()
+        length = len(seq)
+        gc = (seq.count('G') + seq.count('C')) / length * 100
+        contigs[rec.id] = {'length': length, 'gc': round(gc, 2),
+                           'pnapi_hit': 'no', 'pnapi_gene': '',
+                           'sprot_hit': 'no', 'sprot_gene': '',
+                           'eggnog_GO': '', 'eggnog_KEGG': '',
+                           'eggnog_COG': '', 'eggnog_Pfam': '',
+                           'augustus_genes': 0}
+
+    #Load DIAMOND Tier 1 hits (P.napi 2022):
+    diamond_pnapi = f"{base_dir}/diamond_annotation/2022_diamond_results/{sample}_diamond_pnapi_2022.out"
+    if os.path.exists(diamond_pnapi):
+        with open(diamond_pnapi) as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                if parts[0] in contigs:
+                    contigs[parts[0]]['pnapi_hit'] = 'yes'
+                    contigs[parts[0]]['pnapi_gene'] = parts[1]
+
+    #Load DIAMOND Tier 2 hits (SwissProt):
+    diamond_sprot = f"{base_dir}/diamond_annotation/diamond_results_sprot_DAS2015/{sample}_diamond_sprot.out"
+    if os.path.exists(diamond_sprot):
+        with open(diamond_sprot) as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                if parts[0] in contigs:
+                    contigs[parts[0]]['sprot_hit'] = 'yes'
+                    contigs[parts[0]]['sprot_gene'] = parts[1]
+
+    #Load eggNOG annotations:
+    eggnog_file = f"{base_dir}/eggnog_output/{sample}_eggnog.emapper.annotations"
+    if os.path.exists(eggnog_file):
+        with open(eggnog_file) as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 10 and parts[0] in contigs:
+                    contigs[parts[0]]['eggnog_GO'] = parts[9] if len(parts) > 9 else ''
+                    contigs[parts[0]]['eggnog_KEGG'] = parts[11] if len(parts) > 11 else ''
+                    contigs[parts[0]]['eggnog_COG'] = parts[6] if len(parts) > 6 else ''
+                    contigs[parts[0]]['eggnog_Pfam'] = parts[20] if len(parts) > 20 else ''
+
+    #Load Augustus gene predictions:
+    augustus_file = f"{base_dir}/augustus_output/{sample}_genes.gff3"
+    if os.path.exists(augustus_file):
+        with open(augustus_file) as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 3 and parts[2] == 'gene':
+                    contig_id = parts[0]
+                    if contig_id in contigs:
+                        contigs[contig_id]['augustus_genes'] += 1
+
+    #Write output table:
+    with open(outfile, 'w', newline='') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerow(['contig_id', 'sample', 'length', 'gc',
+                        'pnapi_hit', 'pnapi_gene',
+                        'sprot_hit', 'sprot_gene',
+                        'eggnog_GO', 'eggnog_KEGG', 'eggnog_COG', 'eggnog_Pfam',
+                        'augustus_genes'])
+        for contig_id, data in contigs.items():
+            writer.writerow([contig_id, sample,
+                           data['length'], data['gc'],
+                           data['pnapi_hit'], data['pnapi_gene'],
+                           data['sprot_hit'], data['sprot_gene'],
+                           data['eggnog_GO'], data['eggnog_KEGG'],
+                           data['eggnog_COG'], data['eggnog_Pfam'],
+                           data['augustus_genes']])
+
+    print(f"{sample}: {len(contigs)} contigs written to {outfile}")
+
+print("All annotation tables complete.")
+
+#Run once all annotation steps complete:
+conda activate btk
+python3 compile_annotation_table.py
+
+#Check output:
+#ls -lh annotation_table/
+#head -3 annotation_table/C13stmor_annotation_table.tsv
+#wc -l annotation_table/*.tsv
 
 
 #######################################################################################################################################################################################
