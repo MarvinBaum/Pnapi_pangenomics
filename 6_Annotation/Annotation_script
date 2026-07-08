@@ -173,11 +173,60 @@ emapper.py --version
 #Download 50G eggNOG database in new directory:
 mkdir -p /mnt/griffin/marvi/Annotation/eggnog_db
 
-nohup download_eggnog_data.py \
-    --data_dir /mnt/griffin/marvi/Annotation/eggnog_db \
-    -y &
+#Then make script for eggNOG data download:
+nano download_eggnog_db.sh
 
-#
+#All of the below is in a nanoscript:
+#!/bin/bash
+
+cd /mnt/griffin/marvi/Annotation/eggnog_db
+
+echo "Downloading eggNOG database files..."
+
+#Main annotation database (~9GB uncompressed):
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.db.gz
+echo "eggnog.db.gz downloaded"
+
+#DIAMOND protein database (~4GB uncompressed):
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog_proteins.dmnd.gz
+echo "eggnog_proteins.dmnd.gz downloaded"
+
+#Taxonomy database:
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.taxa.tar.gz
+echo "eggnog.taxa.tar.gz downloaded"
+
+#Decompress:
+echo "Decompressing..."
+gunzip eggnog.db.gz
+gunzip eggnog_proteins.dmnd.gz
+tar -xzf eggnog.taxa.tar.gz
+rm eggnog.taxa.tar.gz
+
+echo "All eggNOG database files ready."
+ls -lh /mnt/griffin/marvi/Annotation/eggnog_db/
+
+#Run the script:
+nohup bash download_eggnog_db.sh &
+
+#Now for the eggNOG command:
+
+mkdir -p eggnog_output
+
+#Lets try first test with C13stmor:
+
+nohup emapper.py \
+    -i repeatmasker_output/C13stmor_1kb_contigs.fasta.masked \
+    --itype metagenome \
+    --data_dir /mnt/griffin/marvi/Annotation/eggnog_db/ \
+    --output C13stmor_eggnog \
+    --output_dir eggnog_output/ \
+    --cpu 16 \
+    -m diamond \
+    --override &
+
+sleep 10
+ps aux | grep emapper | grep -v grep
+cat nohup.out | tail -10
 
 #####################################################################################################################################################################################
 
