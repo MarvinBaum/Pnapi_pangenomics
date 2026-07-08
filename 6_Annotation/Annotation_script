@@ -286,37 +286,42 @@ nohup bash eggnog_run.sh &
 ##################################################################################################################################################################################
 #Step 4: Gene prediction using Augustus
 #
-#Species model: Pnapi_chromosomes2 - P.napi specific trained model
-#Found in Augustus 3.2.1 on duke: /data/programs/augustus-3.2.1/config/species/Pnapi_chromosomes2
-#Trained on P.napi chromosome-level reference genome (GCF_905475465.1_ilPieNapi1.2)
-#This is the most appropriate model available - same species as study organism
-#Also available: Pnapi_chromosomes (first training), Prapae_N902 (P.rapae sister species)
+#Species model: heliconius_melpomene1 - closest COMPLETE Lepidoptera model available
+#Found in Augustus 3.2.1 on duke: /data/programs/augustus-3.2.1/config/species/heliconius_melpomene1
+#
+#Note: P.napi specific models (Pnapi_chromosomes, Pnapi_chromosomes2) exist on duke but are
+#      INCOMPLETE - missing required probability parameter files (_exon_probs.pbl,
+#      _intron_probs.pbl, _igenic_probs.pbl) needed for gene prediction.
+#      P.rapae models (Prapae_N90, Prapae_N902) similarly incomplete.
+#      No complete Pieris-specific Augustus model found on duke or publicly available online.
+#      heliconius_melpomene1 is the closest complete Lepidoptera model available.
 #
 #Input: repeat-masked contigs from RepeatMasker Arthropoda run (*.masked files)
 #       located in: /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/
-#Output: GFF3 gene prediction files per sample
+#Output: GFF3 gene prediction files per sample in augustus_output/
+##################################################################################################################################################################################
 
-#Make new directory:
 mkdir -p /mnt/griffin/marvi/Annotation/augustus_output
 
 #Dryrun first:
 ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
-    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 2 \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel --dryrun -j 4 \
     "/data/programs/augustus-3.2.1/bin/augustus \
-    --species=Pnapi_chromosomes2 \
+    --species=heliconius_melpomene1 \
     --gff3=on \
     --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
     /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked"
 
 #Real command:
 nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/*_1kb_contigs.fasta.masked | \
-    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 2 \
+    xargs -n1 basename -s "_1kb_contigs.fasta.masked" | parallel -j 4 \
     "/data/programs/augustus-3.2.1/bin/augustus \
-    --species=Pnapi_chromosomes2 \
+    --species=heliconius_melpomene1 \
     --gff3=on \
     --outfile=/mnt/griffin/marvi/Annotation/augustus_output/{}_genes.gff3 \
     /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/{}_1kb_contigs.fasta.masked"' &
-######################################################################################################################################################################################
+##################################################################################################################################################################################
+
 
 #Step 5: Compile annotation table
 
