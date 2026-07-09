@@ -264,7 +264,7 @@ nohup emapper.py \
 
 cd /mnt/griffin/marvi/Annotation
 
-for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+for sample in E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
     echo "Running eggNOG-mapper for ${sample}..."
     emapper.py \
         -i repeatmasker_output_arthropoda/${sample}_1kb_contigs.fasta.masked \
