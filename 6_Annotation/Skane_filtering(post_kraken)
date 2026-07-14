@@ -22,3 +22,161 @@ $BLOBTOOLS filter \
 #Check for FASTA output:
 ls /mnt/griffin/marvi/Annotation/skane_gcfiltered/
 ls /mnt/griffin/marvi/Annotation/contigs_for_annotation_1kb/ | grep filtered
+
+
+##################################################################################################################################################################################
+#Skåne GC-filtered reanalysis
+
+#S14skanF and S14skanM showed severe bacterial contamination despite Kraken2 filtering:
+#   - GC content: 60.65% (S14skanF) and 59.36% (S14skanM) vs ~33-40% expected for Lepidoptera
+#   - RepeatMasker: only 1.0-1.16% masking (bacterial sequences lack eukaryotic TEs)
+#   - DIAMOND: 57.9% and 54.9% SwissProt hits (mostly bacterial proteins)
+#   - BlobToolKit: clear bacterial cluster at 0.55-0.70 GC in combined blobplots
+
+#Solution: BlobToolKit GC filter (gc--Max=0.50) removes bacterial contigs
+#Results: S14skanF 9,571 → 3,877 contigs (59.5% removed)
+#         S14skanM 6,915 → 2,958 contigs (57.2% removed)
+
+#Filtered FASTAs located at:
+#   /mnt/griffin/marvi/Annotation/skane_gcfiltered/S14skanF_1kb_contigs_gcfiltered.fasta
+#   /mnt/griffin/marvi/Annotation/skane_gcfiltered/S14skanM_1kb_contigs_gcfiltered.fasta
+##################################################################################################################################################################################
+
+##################################################################################################################################################################################
+#Step 1: RepeatMasker (Arthropoda Dfam) on GC-filtered contigs
+##################################################################################################################################################################################
+
+cd /mnt/griffin/marvi/Annotation
+export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+
+mkdir -p repeatmasker_output_arthropoda/skane_gcfiltered
+
+nohup bash -c '
+export PERL5LIB=~/perl5/lib/perl5:$PERL5LIB
+
+for sample in S14skanF S14skanM; do
+    echo "Running RepeatMasker (Arthropoda) for ${sample} GC-filtered..."
+    /data/programs/RepeatMasker/RepeatMasker \
+        -species arthropoda \
+        -pa 4 \
+        -xsmall \
+        -dir /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/ \
+        /mnt/griffin/marvi/Annotation/skane_gcfiltered/${sample}_1kb_contigs_gcfiltered.fasta
+    echo "${sample}: done"
+done
+echo "RepeatMasker complete for GC-filtered Skane samples."
+' &
+
+#Check output:
+#ls -lh repeatmasker_output_arthropoda/skane_gcfiltered/
+#cat repeatmasker_output_arthropoda/skane_gcfiltered/S14skanF_1kb_contigs_gcfiltered.fasta.tbl
+
+##################################################################################################################################################################################
+#Step 2a: DIAMOND blastx vs P.napi 2022 proteins on GC-filtered contigs
+##################################################################################################################################################################################
+
+mkdir -p diamond_annotation/2022_diamond_results/skane_gcfiltered
+
+#Dryrun:
+ls repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel --dryrun -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query repeatmasker_output_arthropoda/skane_gcfiltered/{}_1kb_contigs_gcfiltered.fasta.masked \
+    --db diamond_annotation/pienap_ilPieNapi1.2_proteins.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out diamond_annotation/2022_diamond_results/skane_gcfiltered/{}_diamond_pnapi_2022_gcfiltered.out"
+
+#Real command:
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/{}_1kb_contigs_gcfiltered.fasta.masked \
+    --db /mnt/griffin/marvi/Annotation/diamond_annotation/pienap_ilPieNapi1.2_proteins.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/2022_diamond_results/skane_gcfiltered/{}_diamond_pnapi_2022_gcfiltered.out"' &
+
+##################################################################################################################################################################################
+#Step 2b: DIAMOND blastx vs UniProt SwissProt on GC-filtered contigs
+##################################################################################################################################################################################
+
+mkdir -p diamond_annotation/diamond_results_sprot/skane_gcfiltered
+
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel -j 2 \
+    "/data/programs/diamond_v0.9.10/diamond blastx \
+    --query /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/{}_1kb_contigs_gcfiltered.fasta.masked \
+    --db /mnt/griffin/marvi/BlobToolKit/diamond_db/uniprot_sprot.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore \
+    --sensitive \
+    --max-target-seqs 1 \
+    --evalue 1e-5 \
+    --threads 8 \
+    --out /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_sprot/skane_gcfiltered/{}_diamond_sprot_gcfiltered.out"' &
+
+##################################################################################################################################################################################
+#Step 3: eggNOG-mapper on GC-filtered contigs
+##################################################################################################################################################################################
+
+mkdir -p eggnog_output/skane_gcfiltered
+
+#Run after RepeatMasker completes (needs masked files):
+#conda activate eggnog
+
+nohup bash -c '
+for sample in S14skanF S14skanM; do
+    echo "Running eggNOG for ${sample} GC-filtered..."
+    emapper.py \
+        -i /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/${sample}_1kb_contigs_gcfiltered.fasta.masked \
+        --itype metagenome \
+        --data_dir /mnt/griffin/marvi/Annotation/eggnog_db/ \
+        --output ${sample}_eggnog_gcfiltered \
+        --output_dir /mnt/griffin/marvi/Annotation/eggnog_output/skane_gcfiltered/ \
+        --cpu 8 \
+        -m diamond \
+        --override
+    echo "${sample}: done"
+done
+echo "eggNOG complete for GC-filtered Skane samples."
+' &
+
+##################################################################################################################################################################################
+#Step 4: Augustus gene prediction on GC-filtered contigs
+##################################################################################################################################################################################
+
+mkdir -p augustus_output/skane_gcfiltered
+
+nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
+    xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel -j 2 \
+    "/data/programs/augustus-3.2.1/bin/augustus \
+    --species=heliconius_melpomene1 \
+    --gff3=on \
+    --outfile=/mnt/griffin/marvi/Annotation/augustus_output/skane_gcfiltered/{}_genes_gcfiltered.gff3 \
+    /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/{}_1kb_contigs_gcfiltered.fasta.masked"' &
+
+##################################################################################################################################################################################
+#Step 5: Compile annotation table for GC-filtered Skane samples
+#Update compile_annotation_table.py to point to gcfiltered input/output directories
+#Then rerun for S14skanF and S14skanM only
+##################################################################################################################################################################################
+
+#Run after all above steps complete:
+#python3 compile_annotation_table_gcfiltered.py
+
+##################################################################################################################################################################################
+#Expected results after GC filtering:
+#S14skanF: 9,571 → 3,877 contigs (59.5% bacterial removed)
+#S14skanM: 6,915 → 2,958 contigs (57.2% bacterial removed)
+#Expected: P.napi hit rate ~29-31% (matching clean samples)
+#Expected: SwissProt hit rate ~10-20% (matching clean samples)
+#Expected: No-hit fraction ~47-60% (matching clean samples)
+#Expected: GC content ~33-40% (matching Lepidoptera expectation)
+#Expected: Augustus gene count ~1,000-2,000 (matching clean samples)
+#####################################################################################

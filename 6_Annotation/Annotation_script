@@ -351,8 +351,27 @@ nano compile_annotation_table.py
 #Nanoscript contents:
 #!/usr/bin/env python3
 
+##################################################################################################################################################################################
 #compile_annotation_table.py
-#Compiles per-contig annotation table from all annotation steps
+#
+#Compiles per-contig annotation table from all annotation steps for each sample.
+#
+#Input files per sample:
+#   repeatmasker_output_arthropoda/{sample}_1kb_contigs.fasta.masked  <- sequence + GC
+#   diamond_annotation/2022_diamond_results/{sample}_diamond_pnapi_2022.out  <- Tier 1
+#   diamond_annotation/diamond_results_sprot_DAS2015/{sample}_diamond_sprot.out  <- Tier 2
+#   eggnog_output/{sample}_eggnog.emapper.annotations  <- functional annotation
+#   augustus_output/{sample}_genes.gff3  <- gene predictions
+#
+#Output:
+#   annotation_table/{sample}_annotation_table.tsv
+#
+#Columns:
+#   contig_id, sample, length, gc, repeat_fraction,
+#   pnapi_hit, pnapi_gene, sprot_hit, sprot_gene,
+#   eggnog_GO, eggnog_KEGG, eggnog_COG, eggnog_Pfam,
+#   augustus_genes
+##################################################################################################################################################################################
 
 import os
 import csv
@@ -363,47 +382,84 @@ samples = ['C13stmor', 'E12aigua', 'S14skanF', 'S14skanM', 'S15lulea',
 
 base_dir = '/mnt/griffin/marvi/Annotation'
 
+os.makedirs(f"{base_dir}/annotation_table", exist_ok=True)
+
 for sample in samples:
     print(f"Processing {sample}...")
 
-    #Output file:
-    outfile = f"{base_dir}/annotation_table/{sample}_annotation_table.tsv"
-
-    #Load contig lengths and GC from masked FASTA:
     contigs = {}
-    fasta = f"{base_dir}/repeatmasker_output_arthropoda/{sample}_1kb_contigs.fasta.masked"
-    for rec in SeqIO.parse(fasta, 'fasta'):
-        seq = str(rec.seq).upper()
-        length = len(seq)
-        gc = (seq.count('G') + seq.count('C')) / length * 100
-        contigs[rec.id] = {'length': length, 'gc': round(gc, 2),
-                           'pnapi_hit': 'no', 'pnapi_gene': '',
-                           'sprot_hit': 'no', 'sprot_gene': '',
-                           'eggnog_GO': '', 'eggnog_KEGG': '',
-                           'eggnog_COG': '', 'eggnog_Pfam': '',
-                           'augustus_genes': 0}
 
-    #Load DIAMOND Tier 1 hits (P.napi 2022):
+    ##############################################
+    #Load contig sequences - get length, GC, repeat fraction from masked FASTA
+    #Masked file has repeat regions in lowercase
+    ##############################################
+    fasta = f"{base_dir}/repeatmasker_output_arthropoda/{sample}_1kb_contigs.fasta.masked"
+    if not os.path.exists(fasta):
+        print(f"  WARNING: masked FASTA not found for {sample}, skipping")
+        continue
+
+    for rec in SeqIO.parse(fasta, 'fasta'):
+        seq = str(rec.seq)
+        length = len(seq)
+        seq_upper = seq.upper()
+        gc = (seq_upper.count('G') + seq_upper.count('C')) / length * 100
+        #Repeat fraction: lowercase bases = masked repeats
+        masked = sum(1 for c in seq if c.islower())
+        repeat_frac = round(masked / length * 100, 2)
+        contigs[rec.id] = {
+            'length': length,
+            'gc': round(gc, 2),
+            'repeat_frac': repeat_frac,
+            'pnapi_hit': 'no',
+            'pnapi_gene': '',
+            'sprot_hit': 'no',
+            'sprot_gene': '',
+            'eggnog_GO': '',
+            'eggnog_KEGG': '',
+            'eggnog_COG': '',
+            'eggnog_Pfam': '',
+            'augustus_genes': 0
+        }
+
+    ##############################################
+    #Load DIAMOND Tier 1 hits - P.napi 2022 proteins
+    ##############################################
     diamond_pnapi = f"{base_dir}/diamond_annotation/2022_diamond_results/{sample}_diamond_pnapi_2022.out"
     if os.path.exists(diamond_pnapi):
         with open(diamond_pnapi) as f:
             for line in f:
                 parts = line.strip().split('\t')
-                if parts[0] in contigs:
+                if len(parts) >= 2 and parts[0] in contigs:
                     contigs[parts[0]]['pnapi_hit'] = 'yes'
                     contigs[parts[0]]['pnapi_gene'] = parts[1]
+    else:
+        print(f"  WARNING: DIAMOND Tier 1 not found for {sample}")
 
-    #Load DIAMOND Tier 2 hits (SwissProt):
+    ##############################################
+    #Load DIAMOND Tier 2 hits - UniProt SwissProt
+    ##############################################
     diamond_sprot = f"{base_dir}/diamond_annotation/diamond_results_sprot_DAS2015/{sample}_diamond_sprot.out"
     if os.path.exists(diamond_sprot):
         with open(diamond_sprot) as f:
             for line in f:
                 parts = line.strip().split('\t')
-                if parts[0] in contigs:
+                if len(parts) >= 2 and parts[0] in contigs:
                     contigs[parts[0]]['sprot_hit'] = 'yes'
                     contigs[parts[0]]['sprot_gene'] = parts[1]
+    else:
+        print(f"  WARNING: DIAMOND Tier 2 not found for {sample}")
 
-    #Load eggNOG annotations:
+    ##############################################
+    #Load eggNOG-mapper annotations
+    #Column indices (0-based):
+    #   0: query ID (contig_ORF, e.g. NODE_1005_..._0)
+    #   6: COG category
+    #   9: GO terms
+    #   11: KEGG KO
+    #   20: Pfam domains
+    #Note: multiple ORFs per contig (_0, _1 etc.) - strip suffix to match contig ID
+    #      For multiple ORFs per contig, concatenate annotations
+    ##############################################
     eggnog_file = f"{base_dir}/eggnog_output/{sample}_eggnog.emapper.annotations"
     if os.path.exists(eggnog_file):
         with open(eggnog_file) as f:
@@ -411,13 +467,38 @@ for sample in samples:
                 if line.startswith('#'):
                     continue
                 parts = line.strip().split('\t')
-                if len(parts) >= 10 and parts[0] in contigs:
-                    contigs[parts[0]]['eggnog_GO'] = parts[9] if len(parts) > 9 else ''
-                    contigs[parts[0]]['eggnog_KEGG'] = parts[11] if len(parts) > 11 else ''
-                    contigs[parts[0]]['eggnog_COG'] = parts[6] if len(parts) > 6 else ''
-                    contigs[parts[0]]['eggnog_Pfam'] = parts[20] if len(parts) > 20 else ''
+                if len(parts) < 10:
+                    continue
+                #Strip ORF suffix to get contig ID:
+                contig_id = '_'.join(parts[0].split('_')[:-1])
+                if contig_id in contigs:
+                    #Append GO terms (multiple ORFs may contribute):
+                    go = parts[9] if len(parts) > 9 and parts[9] != '-' else ''
+                    kegg = parts[11] if len(parts) > 11 and parts[11] != '-' else ''
+                    cog = parts[6] if len(parts) > 6 and parts[6] != '-' else ''
+                    pfam = parts[20] if len(parts) > 20 and parts[20] != '-' else ''
+                    #Concatenate if multiple ORFs:
+                    if go and contigs[contig_id]['eggnog_GO']:
+                        contigs[contig_id]['eggnog_GO'] += ',' + go
+                    elif go:
+                        contigs[contig_id]['eggnog_GO'] = go
+                    if kegg and contigs[contig_id]['eggnog_KEGG']:
+                        contigs[contig_id]['eggnog_KEGG'] += ',' + kegg
+                    elif kegg:
+                        contigs[contig_id]['eggnog_KEGG'] = kegg
+                    if cog and not contigs[contig_id]['eggnog_COG']:
+                        contigs[contig_id]['eggnog_COG'] = cog
+                    if pfam and contigs[contig_id]['eggnog_Pfam']:
+                        contigs[contig_id]['eggnog_Pfam'] += ',' + pfam
+                    elif pfam:
+                        contigs[contig_id]['eggnog_Pfam'] = pfam
+    else:
+        print(f"  WARNING: eggNOG annotations not found for {sample}")
 
-    #Load Augustus gene predictions:
+    ##############################################
+    #Load Augustus gene predictions
+    #Count genes per contig from GFF3 file
+    ##############################################
     augustus_file = f"{base_dir}/augustus_output/{sample}_genes.gff3"
     if os.path.exists(augustus_file):
         with open(augustus_file) as f:
@@ -429,37 +510,42 @@ for sample in samples:
                     contig_id = parts[0]
                     if contig_id in contigs:
                         contigs[contig_id]['augustus_genes'] += 1
+    else:
+        print(f"  WARNING: Augustus GFF3 not found for {sample}")
 
-    #Write output table:
+    ##############################################
+    #Write output table
+    ##############################################
+    outfile = f"{base_dir}/annotation_table/{sample}_annotation_table.tsv"
     with open(outfile, 'w', newline='') as f:
         writer = csv.writer(f, delimiter='\t')
-        writer.writerow(['contig_id', 'sample', 'length', 'gc',
-                        'pnapi_hit', 'pnapi_gene',
-                        'sprot_hit', 'sprot_gene',
-                        'eggnog_GO', 'eggnog_KEGG', 'eggnog_COG', 'eggnog_Pfam',
-                        'augustus_genes'])
+        writer.writerow([
+            'contig_id', 'sample', 'length', 'gc', 'repeat_frac',
+            'pnapi_hit', 'pnapi_gene',
+            'sprot_hit', 'sprot_gene',
+            'eggnog_GO', 'eggnog_KEGG', 'eggnog_COG', 'eggnog_Pfam',
+            'augustus_genes'
+        ])
         for contig_id, data in contigs.items():
-            writer.writerow([contig_id, sample,
-                           data['length'], data['gc'],
-                           data['pnapi_hit'], data['pnapi_gene'],
-                           data['sprot_hit'], data['sprot_gene'],
-                           data['eggnog_GO'], data['eggnog_KEGG'],
-                           data['eggnog_COG'], data['eggnog_Pfam'],
-                           data['augustus_genes']])
+            writer.writerow([
+                contig_id, sample,
+                data['length'], data['gc'], data['repeat_frac'],
+                data['pnapi_hit'], data['pnapi_gene'],
+                data['sprot_hit'], data['sprot_gene'],
+                data['eggnog_GO'], data['eggnog_KEGG'],
+                data['eggnog_COG'], data['eggnog_Pfam'],
+                data['augustus_genes']
+            ])
 
-    print(f"{sample}: {len(contigs)} contigs written to {outfile}")
+    total = len(contigs)
+    pnapi = sum(1 for v in contigs.values() if v['pnapi_hit'] == 'yes')
+    sprot = sum(1 for v in contigs.values() if v['sprot_hit'] == 'yes')
+    eggnog = sum(1 for v in contigs.values() if v['eggnog_GO'] != '')
+    aug = sum(1 for v in contigs.values() if v['augustus_genes'] > 0)
+    print(f"  {total} contigs | P.napi: {pnapi} | SwissProt: {sprot} | eggNOG GO: {eggnog} | Augustus genes: {aug}")
+    print(f"  Written to {outfile}")
 
-print("All annotation tables complete.")
-
-#Run once all annotation steps complete:
-conda activate btk
-python3 compile_annotation_table.py
-
-#Check output:
-#ls -lh annotation_table/
-#head -3 annotation_table/C13stmor_annotation_table.tsv
-#wc -l annotation_table/*.tsv
-
+print("\nAll annotation tables complete.")
 
 #######################################################################################################################################################################################
 
