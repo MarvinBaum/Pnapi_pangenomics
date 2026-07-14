@@ -107,7 +107,7 @@ nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/s
 #Step 2b: DIAMOND blastx vs UniProt SwissProt on GC-filtered contigs
 ##################################################################################################################################################################################
 
-mkdir -p diamond_annotation/diamond_results_sprot/skane_gcfiltered
+mkdir -p /mnt/griffin/marvi/Annotation/diamond_annotation/diamond_results_sprot/skane_gcfiltered
 
 nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel -j 2 \
@@ -125,14 +125,12 @@ nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/s
 #Step 3: eggNOG-mapper on GC-filtered contigs
 ##################################################################################################################################################################################
 
-mkdir -p eggnog_output/skane_gcfiltered
-
-#Run after RepeatMasker completes (needs masked files):
-#conda activate eggnog
+#eggNOG:
+conda activate eggnog
+mkdir -p /mnt/griffin/marvi/Annotation/eggnog_output/skane_gcfiltered
 
 nohup bash -c '
 for sample in S14skanF S14skanM; do
-    echo "Running eggNOG for ${sample} GC-filtered..."
     emapper.py \
         -i /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/${sample}_1kb_contigs_gcfiltered.fasta.masked \
         --itype metagenome \
@@ -143,15 +141,13 @@ for sample in S14skanF S14skanM; do
         -m diamond \
         --override
     echo "${sample}: done"
-done
-echo "eggNOG complete for GC-filtered Skane samples."
-' &
+done' &
 
 ##################################################################################################################################################################################
 #Step 4: Augustus gene prediction on GC-filtered contigs
 ##################################################################################################################################################################################
 
-mkdir -p augustus_output/skane_gcfiltered
+mkdir -p /mnt/griffin/marvi/Annotation/augustus_output/skane_gcfiltered
 
 nohup bash -c 'ls /mnt/griffin/marvi/Annotation/repeatmasker_output_arthropoda/skane_gcfiltered/*_gcfiltered.fasta.masked | \
     xargs -n1 basename -s "_1kb_contigs_gcfiltered.fasta.masked" | parallel -j 2 \
