@@ -17,8 +17,6 @@ for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15
     echo "${sample}: $total total -> $kept retained (>1kb)"
 done
 
-#We will still look at the smaller contigs, but this will reduce the noise for the hopefully larger and more informative contigs.
-
 ##################################################################################################################################################################################
 ##################################################################################################################################################################################
 #Step 1: RepeatMasker
