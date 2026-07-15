@@ -605,7 +605,7 @@ grep -c ">" presence_frequency_matrix/all_contigs_combined.fasta
 
 echo "Clustering contigs with CD-HIT..."
 
-nohup /data/programs/cd-hit-v4.5.4/cd-hit \
+nohup cd-hit-est \
     -i presence_frequency_matrix/all_contigs_combined.fasta \
     -o presence_frequency_matrix/nonredundant_catalogue.fasta \
     -c 0.95 \
@@ -616,8 +616,8 @@ nohup /data/programs/cd-hit-v4.5.4/cd-hit \
     -d 0 > presence_frequency_matrix/cdhit.log 2>&1 &
 
 #Check output:
-#grep -c ">" presence_frequency_matrix/nonredundant_catalogue.fasta
-#cat presence_frequency_matrix/cdhit.log | tail -10
+grep -c ">" presence_frequency_matrix/nonredundant_catalogue.fasta
+cat presence_frequency_matrix/cdhit.log | tail -10
 
 ##################################################################################################################################################################################
 #Step 6c: Index non-redundant catalogue with BWA-mem2
@@ -633,46 +633,47 @@ nohup /data/programs/cd-hit-v4.5.4/cd-hit \
 #Run after BWA-mem2 indexing completes
 ##################################################################################################################################################################################
 
-#nohup bash -c '
-#for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
-#    echo "Mapping ${sample} reads to catalogue..."
-#    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem \
-#        -t 8 \
-#        /mnt/griffin/marvi/Annotation/presence_frequency_matrix/nonredundant_catalogue.fasta \
-#        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R1.fastq.gz \
-#        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R2.fastq.gz | \
-#    /data/programs/samtools-1.9/samtools sort -@ 4 -o \
-#        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
-#    /data/programs/samtools-1.9/samtools index \
-#        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
-#    echo "${sample}: done"
-#done' &
+nohup bash -c '
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Mapping ${sample} reads to catalogue..."
+    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem \
+       -t 8 \
+        /mnt/griffin/marvi/Annotation/presence_frequency_matrix/nonredundant_catalogue.fasta \
+        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R1.fastq.gz \
+        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R2.fastq.gz | \
+    /data/programs/samtools-1.9/samtools sort -@ 4 -o \
+        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
+    /data/programs/samtools-1.9/samtools index \
+        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
+    echo "${sample}: done"
+done' &
 
 ##################################################################################################################################################################################
 #Step 6e: Calculate coverage breadth and depth per contig per population
 #Run after all BAM files created
 ##################################################################################################################################################################################
 
-#nohup bash -c '
-#for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
-#    echo "Calculating coverage for ${sample}..."
-#    /data/programs/samtools-1.9/samtools coverage \
-#        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam \
-#        > presence_frequency_matrix/coverage/${sample}_coverage.txt
-#    echo "${sample}: done"
-#done' &
+nohup bash -c '
+for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
+    echo "Calculating coverage for ${sample}..."
+    /data/programs/samtools-1.9/samtools coverage \
+        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam \
+        > presence_frequency_matrix/coverage/${sample}_coverage.txt
+    echo "${sample}: done"
+done' &
 
 ##################################################################################################################################################################################
 #Step 6f: Generate presence/absence and frequency matrix
 #Run after all coverage files created
 ##################################################################################################################################################################################
 
-#python3 generate_matrix.py
+python3 generate_matrix.py
 
 #And the script:
 nano /mnt/griffin/marvi/Annotation/generate_matrix.py
 
 #Contains this:
+
 #!/usr/bin/env python3
 
 ##################################################################################################################################################################################
