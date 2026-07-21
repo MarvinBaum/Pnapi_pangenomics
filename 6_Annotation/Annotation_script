@@ -546,19 +546,15 @@ for sample in samples:
 print("\nAll annotation tables complete.")
 
 #######################################################################################################################################################################################
-
-#Step 6: Create a presence/absence matrix.
-
-##################################################################################################################################################################################
 #Step 6: Presence/frequency matrix across populations
 #
 #Goal: Determine which accessory contigs are present in which populations
 #      and at what frequency - the core clinal analysis
 #
 #Approach:
-#   1. Merge all 10 populations' accessory contigs into one combined FASTA
+#   1. Merge all 10 populations accessory contigs into one combined FASTA
 #      Note: GC-filtered contigs used for S14skanF and S14skanM
-#   2. Cluster at 95% identity using CD-HIT to create non-redundant catalogue
+#   2. Cluster at 95% identity using CD-HIT-EST to create non-redundant catalogue
 #   3. Index catalogue with BWA-mem2
 #   4. Map each population's original unmapped reads back to catalogue
 #   5. Calculate per-contig coverage breadth and depth per population
@@ -566,44 +562,45 @@ print("\nAll annotation tables complete.")
 #      and frequency matrix (mean coverage depth per contig per population)
 #
 #Tools:
-#   CD-HIT v4.5.4: /data/programs/cd-hit-v4.5.4/cd-hit
-#   BWA-mem2: /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2
-#   samtools: /data/programs/samtools-1.9/samtools
+#   CD-HIT-EST v4.8.1: installed via conda in btk environment
+#   BWA-mem2 v2.3: /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2
+#   samtools v1.9: /data/programs/samtools-1.9/samtools
 ##################################################################################################################################################################################
 
 cd /mnt/griffin/marvi/Annotation
 mkdir -p presence_frequency_matrix
+mkdir -p presence_frequency_matrix/bam
+mkdir -p presence_frequency_matrix/coverage
 
 ##################################################################################################################################################################################
 #Step 6a: Merge all accessory contigs into one combined FASTA
 #Use GC-filtered contigs for S14skanF and S14skanM
-#Use standard filtered contigs for all other samples
+#Use standard 1kb filtered contigs for all other samples
+#Result: 47,024 total contigs combined
 ##################################################################################################################################################################################
 
 echo "Merging accessory contigs from all populations..."
 
-#Clean samples - use standard 1kb filtered contigs:
 for sample in C13stmor E12aigua S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
     cat contigs_for_annotation_1kb/${sample}_1kb_contigs.fasta
 done > presence_frequency_matrix/all_contigs_combined.fasta
 
-#Skane samples - use GC-filtered contigs:
 cat skane_gcfiltered/S14skanF_1kb_contigs_gcfiltered.fasta >> presence_frequency_matrix/all_contigs_combined.fasta
 cat skane_gcfiltered/S14skanM_1kb_contigs_gcfiltered.fasta >> presence_frequency_matrix/all_contigs_combined.fasta
 
-#Check total:
 grep -c ">" presence_frequency_matrix/all_contigs_combined.fasta
+#Result: 47,024 contigs
 
 ##################################################################################################################################################################################
-#Step 6b: Cluster at 95% identity with CD-HIT to create non-redundant catalogue
+#Step 6b: Cluster at 95% identity with CD-HIT-EST to create non-redundant catalogue
+#Note: cd-hit-est used (not cd-hit) as input is nucleotide sequences not proteins
 #-c 0.95: cluster sequences at 95% identity
-#-aS 0.90: alignment coverage of shorter sequence >= 90%
-#-n 8: word size (recommended for 0.90-1.0 identity)
+#-aS 0.90: alignment must cover 90% of shorter sequence
+#-n 8: word size for 0.95 identity threshold
 #-T 16: threads
 #-M 16000: memory limit 16GB
+#Result: 37,910 non-redundant contigs (19.4% redundancy removed)
 ##################################################################################################################################################################################
-
-echo "Clustering contigs with CD-HIT..."
 
 nohup cd-hit-est \
     -i presence_frequency_matrix/all_contigs_combined.fasta \
@@ -615,135 +612,111 @@ nohup cd-hit-est \
     -M 16000 \
     -d 0 > presence_frequency_matrix/cdhit.log 2>&1 &
 
-#Check output:
-grep -c ">" presence_frequency_matrix/nonredundant_catalogue.fasta
-cat presence_frequency_matrix/cdhit.log | tail -10
+#grep -c ">" presence_frequency_matrix/nonredundant_catalogue.fasta
+#Result: 37,910 non-redundant contigs
 
 ##################################################################################################################################################################################
 #Step 6c: Index non-redundant catalogue with BWA-mem2
 #Run after CD-HIT completes
+#Result: index files (.0123, .amb, .ann, .bwt.2bit.64, .pac)
 ##################################################################################################################################################################################
 
-#/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index \
-#    presence_frequency_matrix/nonredundant_catalogue.fasta
+nohup /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 index \
+    presence_frequency_matrix/nonredundant_catalogue.fasta &
 
 ##################################################################################################################################################################################
 #Step 6d: Map each population's reads to the non-redundant catalogue
-#Use original unmapped reads from CTQ_Read_Data
+#Read filenames mapped to sample codes in map_reads.sh nanoscript
 #Run after BWA-mem2 indexing completes
+#-t 8: BWA-mem2 threads
+#-@ 4: samtools sort threads
 ##################################################################################################################################################################################
 
-nohup bash -c '
+#map_reads.sh contains sample-to-filename mapping and runs BWA-mem2 + samtools sort + index
+#for all 10 samples sequentially
+
+#map_reads.sh contents:
+cat > /mnt/griffin/marvi/Annotation/presence_frequency_matrix/map_reads.sh << 'EOF'
+#!/bin/bash
+
+READS=/mnt/griffin/marvi/CTQ_Read_Data
+BWA=/data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2
+SAMTOOLS=/data/programs/samtools-1.9/samtools
+CATALOGUE=/mnt/griffin/marvi/Annotation/presence_frequency_matrix/nonredundant_catalogue.fasta
+BAM=/mnt/griffin/marvi/Annotation/presence_frequency_matrix/bam
+
+declare -A R1
+declare -A R2
+
+R1[C13stmor]="Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_1.ctq.fq.gz"
+R1[E12aigua]="Pieris_napi.ESP.12.Aiguamolls.Field.Thorax.24_1.ctq.fq.gz"
+R1[S14skanF]="Pieris_napi.SWE.14.Skane_Kullaberg.Field_females.Thorax.24_1.ctq.fq.gz"
+R1[S14skanM]="Pieris_napi.SWE.14.Skane_Kullaberg.Field.Thorax.24_Males_1.ctq.fq.gz"
+R1[S15lulea]="Pieris_napi.SWE.15.Lulea_Avan.Field.Thorax.30_1.ctq.fq.gz"
+R1[S15stoEA]="Pieris_napi.SWE.15.Stockholm_SU.Field_earlyAug.Abdomen.30_1.ctq.fq.gz"
+R1[S15stoLA]="Pieris_napi.SWE.15.Stockholm_SU.Field_lateAug.Abdomen.36_1.ctq.fq.gz"
+R1[S15stoMJ]="Pieris_napi.SWE.2015.Stockholm_SU.Field_midJuly.Abdomen.35_1.ctq.fq.gz"
+R1[S15sunds]="Pieris_napi.SWE.15.Sundsvall.Field.Thorax.29_1.ctq.fq.gz"
+R1[S15umea]="Pieris_napi.SWE.15.Umea.Field.Thorax.30_1.ctq.fq.gz"
+
+R2[C13stmor]="Pieris_napi.CHF.13.StMoritz.Field.Thorax.24_2.ctq.fq.gz"
+R2[E12aigua]="Pieris_napi.ESP.12.Aiguamolls.Field.Thorax.24_2.ctq.fq.gz"
+R2[S14skanF]="Pieris_napi.SWE.14.Skane_Kullaberg.Field_females.Thorax.24_2.ctq.fq.gz"
+R2[S14skanM]="Pieris_napi.SWE.14.Skane_Kullaberg.Field.Thorax.24_Males_2.ctq.fq.gz"
+R2[S15lulea]="Pieris_napi.SWE.15.Lulea_Avan.Field.Thorax.30_2.ctq.fq.gz"
+R2[S15stoEA]="Pieris_napi.SWE.15.Stockholm_SU.Field_earlyAug.Abdomen.30_2.ctq.fq.gz"
+R2[S15stoLA]="Pieris_napi.SWE.15.Stockholm_SU.Field_lateAug.Abdomen.36_2.ctq.fq.gz"
+R2[S15stoMJ]="Pieris_napi.SWE.2015.Stockholm_SU.Field_midJuly.Abdomen.35_2.ctq.fq.gz"
+R2[S15sunds]="Pieris_napi.SWE.15.Sundsvall.Field.Thorax.29_2.ctq.fq.gz"
+R2[S15umea]="Pieris_napi.SWE.15.Umea.Field.Thorax.30_2.ctq.fq.gz"
+
 for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
     echo "Mapping ${sample} reads to catalogue..."
-    /data/programs/bwa-mem2-2.3_x64-linux/bwa-mem2 mem \
-       -t 8 \
-        /mnt/griffin/marvi/Annotation/presence_frequency_matrix/nonredundant_catalogue.fasta \
-        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R1.fastq.gz \
-        /mnt/griffin/marvi/CTQ_Read_Data/${sample}_R2.fastq.gz | \
-    /data/programs/samtools-1.9/samtools sort -@ 4 -o \
-        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
-    /data/programs/samtools-1.9/samtools index \
-        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam
+    $BWA mem \
+        -t 8 \
+        $CATALOGUE \
+        $READS/${R1[$sample]} \
+        $READS/${R2[$sample]} | \
+    $SAMTOOLS sort -@ 4 \
+        -o $BAM/${sample}_vs_catalogue.srt.bam
+    $SAMTOOLS index -c $BAM/${sample}_vs_catalogue.srt.bam
     echo "${sample}: done"
-done' &
+done
+
+echo "All samples mapped to catalogue."
+EOF
+
+#Run the script:
+
+nohup bash presence_frequency_matrix/map_reads.sh &
 
 ##################################################################################################################################################################################
 #Step 6e: Calculate coverage breadth and depth per contig per population
 #Run after all BAM files created
+#samtools coverage outputs per-contig: breadth (% bases covered) and mean depth
 ##################################################################################################################################################################################
 
 nohup bash -c '
+mkdir -p /mnt/griffin/marvi/Annotation/presence_frequency_matrix/coverage
+
 for sample in C13stmor E12aigua S14skanF S14skanM S15lulea S15stoEA S15stoLA S15stoMJ S15sunds S15umea; do
     echo "Calculating coverage for ${sample}..."
     /data/programs/samtools-1.9/samtools coverage \
-        presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam \
-        > presence_frequency_matrix/coverage/${sample}_coverage.txt
+        /mnt/griffin/marvi/Annotation/presence_frequency_matrix/bam/${sample}_vs_catalogue.srt.bam \
+        > /mnt/griffin/marvi/Annotation/presence_frequency_matrix/coverage/${sample}_coverage.txt
     echo "${sample}: done"
-done' &
+done
+echo "All coverage files complete."' &
 
 ##################################################################################################################################################################################
 #Step 6f: Generate presence/absence and frequency matrix
 #Run after all coverage files created
-##################################################################################################################################################################################
-
-python3 generate_matrix.py
-
-#And the script:
-nano /mnt/griffin/marvi/Annotation/generate_matrix.py
-
-#Contains this:
-
-#!/usr/bin/env python3
-
-##################################################################################################################################################################################
-#generate_matrix.py
-#Generates presence/absence and frequency matrix from samtools coverage output
-#
-#Input: coverage files per sample from samtools coverage
+#BREADTH_THRESHOLD = 0.50: contig considered present if >50% of bases covered
 #Output:
-#   presence_absence_matrix.tsv - 1/0 per contig per population
-#   frequency_matrix.tsv - mean depth per contig per population
+#   presence_absence_matrix.tsv - binary 1/0 per contig per population
+#   frequency_matrix.tsv - mean coverage depth per contig per population
 ##################################################################################################################################################################################
 
-import os
-import pandas as pd
-
-samples = ['C13stmor', 'E12aigua', 'S14skanF', 'S14skanM', 'S15lulea',
-           'S15stoEA', 'S15stoLA', 'S15stoMJ', 'S15sunds', 'S15umea']
-
-base_dir = '/mnt/griffin/marvi/Annotation/presence_frequency_matrix'
-coverage_dir = f"{base_dir}/coverage"
-
-#Breadth threshold for presence - contig considered present if >50% covered:
-BREADTH_THRESHOLD = 0.50
-
-#Load coverage data per sample:
-print("Loading coverage data...")
-coverage_data = {}
-for sample in samples:
-    cov_file = f"{coverage_dir}/{sample}_coverage.txt"
-    if os.path.exists(cov_file):
-        df = pd.read_csv(cov_file, sep='\t', comment='#',
-                        names=['contig', 'startpos', 'endpos', 'numreads',
-                               'covbases', 'coverage', 'meandepth', 'meanbaseq', 'meanmapq'])
-        coverage_data[sample] = df.set_index('contig')
-        print(f"  {sample}: {len(df)} contigs")
-    else:
-        print(f"  WARNING: coverage file not found for {sample}")
-
-#Get all contig IDs:
-all_contigs = set()
-for sample, df in coverage_data.items():
-    all_contigs.update(df.index)
-all_contigs = sorted(all_contigs)
-print(f"\nTotal unique contigs in catalogue: {len(all_contigs)}")
-
-#Build presence/absence matrix:
-print("Building presence/absence matrix...")
-presence_matrix = pd.DataFrame(0, index=all_contigs, columns=samples)
-frequency_matrix = pd.DataFrame(0.0, index=all_contigs, columns=samples)
-
-for sample, df in coverage_data.items():
-    for contig in all_contigs:
-        if contig in df.index:
-            breadth = df.loc[contig, 'coverage'] / 100
-            depth = df.loc[contig, 'meandepth']
-            presence_matrix.loc[contig, sample] = 1 if breadth >= BREADTH_THRESHOLD else 0
-            frequency_matrix.loc[contig, sample] = round(depth, 2)
-
-#Write output:
-presence_matrix.to_csv(f"{base_dir}/presence_absence_matrix.tsv", sep='\t')
-frequency_matrix.to_csv(f"{base_dir}/frequency_matrix.tsv", sep='\t')
-
-#Summary statistics:
-print("\nPresence/absence summary:")
-presence_matrix['n_populations'] = presence_matrix.sum(axis=1)
-print(f"  Core accessory (all 10 populations): {(presence_matrix['n_populations'] == 10).sum()}")
-print(f"  Rare (only 1 population): {(presence_matrix['n_populations'] == 1).sum()}")
-print(f"  Total contigs in catalogue: {len(all_contigs)}")
-
-print("\nDone. Output files:")
-print(f"  {base_dir}/presence_absence_matrix.tsv")
-print(f"  {base_dir}/frequency_matrix.tsv")
-########################################################################################################################################################################################
+conda activate btk
+python3 /mnt/griffin/marvi/Annotation/generate_matrix.py
+##################################################################################################################################################################################
