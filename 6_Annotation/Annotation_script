@@ -715,7 +715,68 @@ echo "All coverage files complete."' &
 #Output:
 #   presence_absence_matrix.tsv - binary 1/0 per contig per population
 #   frequency_matrix.tsv - mean coverage depth per contig per population
-##################################################################################################################################################################################
+
+nano /mnt/griffin/marvi/Annotation/generate_matrix.py
+
+#Script contains this: 
+#!/usr/bin/env python3
+
+import os
+import pandas as pd
+
+samples = ['C13stmor', 'E12aigua', 'S14skanF', 'S14skanM', 'S15lulea',
+           'S15stoEA', 'S15stoLA', 'S15stoMJ', 'S15sunds', 'S15umea']
+
+base_dir = '/mnt/griffin/marvi/Annotation/presence_frequency_matrix'
+coverage_dir = f"{base_dir}/coverage"
+
+BREADTH_THRESHOLD = 0.50
+
+print("Loading coverage data...")
+coverage_data = {}
+for sample in samples:
+    cov_file = f"{coverage_dir}/{sample}_coverage.txt"
+    if os.path.exists(cov_file):
+        df = pd.read_csv(cov_file, sep='\t', comment='#',
+                        names=['contig', 'startpos', 'endpos', 'numreads',
+                               'covbases', 'coverage', 'meandepth', 'meanbaseq', 'meanmapq'])
+        coverage_data[sample] = df.set_index('contig')
+        print(f"  {sample}: {len(df)} contigs")
+    else:
+        print(f"  WARNING: coverage file not found for {sample}")
+
+all_contigs = set()
+for sample, df in coverage_data.items():
+    all_contigs.update(df.index)
+all_contigs = sorted(all_contigs)
+print(f"\nTotal unique contigs in catalogue: {len(all_contigs)}")
+
+print("Building presence/absence and frequency matrices...")
+presence_matrix = pd.DataFrame(0, index=all_contigs, columns=samples)
+frequency_matrix = pd.DataFrame(0.0, index=all_contigs, columns=samples)
+
+for sample, df in coverage_data.items():
+    for contig in all_contigs:
+        if contig in df.index:
+            breadth = df.loc[contig, 'coverage'] / 100
+            depth = df.loc[contig, 'meandepth']
+            presence_matrix.loc[contig, sample] = 1 if breadth >= BREADTH_THRESHOLD else 0
+            frequency_matrix.loc[contig, sample] = round(depth, 2)
+
+presence_matrix.to_csv(f"{base_dir}/presence_absence_matrix.tsv", sep='\t')
+frequency_matrix.to_csv(f"{base_dir}/frequency_matrix.tsv", sep='\t')
+
+print("\nPresence/absence summary:")
+presence_matrix['n_populations'] = presence_matrix.sum(axis=1)
+print(f"  Core accessory (all 10 populations): {(presence_matrix['n_populations'] == 10).sum()}")
+print(f"  Rare (only 1 population): {(presence_matrix['n_populations'] == 1).sum()}")
+print(f"  Total contigs in catalogue: {len(all_contigs)}")
+
+print("\nDone. Output files:")
+print(f"  {base_dir}/presence_absence_matrix.tsv")
+print(f"  {base_dir}/frequency_matrix.tsv")
+
+#Run script:
 
 conda activate btk
 python3 /mnt/griffin/marvi/Annotation/generate_matrix.py
